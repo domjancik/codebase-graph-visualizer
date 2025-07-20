@@ -48,6 +48,11 @@ class GraphVisualizerServer {
     this.app.get('/api/tasks', this.getTasks.bind(this));
     this.app.get('/api/overview/:codebase', this.getCodebaseOverview.bind(this));
     this.app.get('/api/dependency-tree/:componentId', this.getDependencyTree.bind(this));
+    
+    // Task management endpoints
+    this.app.post('/api/tasks', this.createTask.bind(this));
+    this.app.post('/api/tasks/execute', this.executeTask.bind(this));
+    this.app.put('/api/tasks/:id/status', this.updateTaskStatus.bind(this));
   }
 
   async healthCheck(req, res) {
@@ -300,6 +305,51 @@ class GraphVisualizerServer {
       res.json(overview);
     } catch (error) {
       console.error('Error fetching codebase overview:', error);
+      res.status(500).json({ error: error.message });
+    } finally {
+      await session.close();
+    }
+  }
+
+  async createTask(req, res) {
+    const { name, description, status, progress, command } = req.body;
+    const session = this.driver.session();
+
+    try {
+      const taskId = `${Date.now()}`; // Simple task ID generation
+      await session.run(`
+        CREATE (t:Task {id: $taskId, name: $name, description: $description, status: $status, progress: $progress, command: $command})
+      `, { taskId, name, description, status, progress, command });
+
+      res.status(201).json({ id: taskId, name, description, status, progress, command });
+    } catch (error) {
+      console.error('Error creating task:', error);
+      res.status(500).json({ error: error.message });
+    } finally {
+      await session.close();
+    }
+  }
+
+  async executeTask(req, res) {
+    const { taskId, command } = req.body;
+    // Placeholder for actual execution logic
+    console.log(`Executing task ${taskId} with command: ${command}`);
+    res.status(200).json({ message: `Task ${taskId} executed with command: ${command}` });
+  }
+
+  async updateTaskStatus(req, res) {
+    const { id } = req.params;
+    const { status } = req.body;
+    const session = this.driver.session();
+
+    try {
+      await session.run(`
+        MATCH (t:Task {id: $id})
+        SET t.status = $status
+      `, { id, status });
+      res.status(200).json({ message: `Task ${id} status updated to ${status}.` });
+    } catch (error) {
+      console.error('Error updating task status:', error);
       res.status(500).json({ error: error.message });
     } finally {
       await session.close();
