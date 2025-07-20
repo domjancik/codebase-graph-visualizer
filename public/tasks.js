@@ -51,6 +51,30 @@ class TaskManager {
         if (e.target === modal) this.closeModal();
       });
     }
+
+    // Add Task Button
+    const addTaskBtn = document.getElementById('addTaskBtn');
+    if (addTaskBtn) {
+      addTaskBtn.addEventListener('click', () => this.openAddTaskModal());
+    }
+
+    // Add Task Modal close
+    const closeAddTaskModal = document.getElementById('close-add-task-modal');
+    if (closeAddTaskModal) {
+      closeAddTaskModal.addEventListener('click', () => this.closeAddTaskModal());
+    }
+
+    // Add Task form
+    const addTaskForm = document.getElementById('add-task-form');
+    if (addTaskForm) {
+      addTaskForm.addEventListener('submit', (e) => this.handleAddTask(e));
+    }
+
+    // Cancel task button
+    const cancelTaskBtn = document.getElementById('cancel-task');
+    if (cancelTaskBtn) {
+      cancelTaskBtn.addEventListener('click', () => this.closeAddTaskModal());
+    }
   }
 
   async loadTasks() {
@@ -265,8 +289,17 @@ class TaskManager {
     }
 
     // Set up action buttons
+    const executeTaskBtn = document.getElementById('execute-task');
     const viewInGraphBtn = document.getElementById('view-in-graph');
     const copyTaskIdBtn = document.getElementById('copy-task-id');
+
+    if (executeTaskBtn) {
+      executeTaskBtn.onclick = () => this.executeTask(task);
+      executeTaskBtn.disabled = !task.command; // Disable if no command
+      if (!task.command) {
+        executeTaskBtn.title = 'No command configured for this task';
+      }
+    }
 
     if (viewInGraphBtn) {
       viewInGraphBtn.onclick = () => this.viewInGraph(task);
@@ -340,6 +373,165 @@ class TaskManager {
     setTimeout(() => {
       errorDiv.style.display = 'none';
     }, 5000);
+  }
+
+  openAddTaskModal() {
+    const modal = document.getElementById('add-task-modal');
+    const taskProjectSelect = document.getElementById('task-project');
+    
+    // Populate project dropdown
+    if (taskProjectSelect) {
+      const projects = new Set();
+      this.components.forEach(component => {
+        if (component.codebase) {
+          projects.add(component.codebase);
+        }
+      });
+      
+      taskProjectSelect.innerHTML = '<option value="">Select project...</option>';
+      Array.from(projects).sort().forEach(project => {
+        const option = document.createElement('option');
+        option.value = project;
+        option.textContent = project;
+        taskProjectSelect.appendChild(option);
+      });
+    }
+    
+    if (modal) {
+      modal.style.display = 'block';
+    }
+  }
+
+  closeAddTaskModal() {
+    const modal = document.getElementById('add-task-modal');
+    if (modal) {
+      modal.style.display = 'none';
+    }
+    
+    // Reset form
+    const form = document.getElementById('add-task-form');
+    if (form) {
+      form.reset();
+    }
+  }
+
+  async handleAddTask(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const taskData = {
+      name: formData.get('name'),
+      description: formData.get('description'),
+      status: formData.get('status'),
+      progress: parseFloat(formData.get('progress')) / 100,
+      command: formData.get('command')
+    };
+    
+    try {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(taskData)
+      });
+      
+      if (response.ok) {
+        this.closeAddTaskModal();
+        this.loadTasks(); // Reload tasks to show the new one
+        this.showSuccess('Task created successfully!');
+      } else {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create task');
+      }
+    } catch (error) {
+      console.error('Error creating task:', error);
+      this.showError('Failed to create task: ' + error.message);
+    }
+  }
+
+  async executeTask(task) {
+    if (!task.command) {
+      alert('No command configured for this task');
+      return;
+    }
+    
+    const confirmed = confirm(`Execute command: "${task.command}"?`);
+    if (!confirmed) return;
+    
+    try {
+      const executeBtn = document.getElementById('execute-task');
+      if (executeBtn) {
+        executeBtn.disabled = true;
+        executeBtn.textContent = '⏳ Executing...';
+      }
+      
+      const response = await fetch('/api/tasks/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          taskId: task.id,
+          command: task.command
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        this.showSuccess('Task executed successfully!');
+        // Update task status to IN_PROGRESS if it was TODO
+        if (task.status === 'TODO') {
+          await this.updateTaskStatus(task.id, 'IN_PROGRESS');
+        }
+        this.loadTasks(); // Reload to show updated status
+      } else {
+        throw new Error(result.message || 'Execution failed');
+      }
+    } catch (error) {
+      console.error('Error executing task:', error);
+      this.showError('Failed to execute task: ' + error.message);
+    } finally {
+      const executeBtn = document.getElementById('execute-task');
+      if (executeBtn) {
+        executeBtn.disabled = false;
+        executeBtn.textContent = '▶️ Execute Task';
+      }
+    }
+  }
+
+  async updateTaskStatus(taskId, newStatus) {
+    try {
+      await fetch(`/api/tasks/${taskId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+    } catch (error) {
+      console.error('Error updating task status:', error);
+    }
+  }
+
+  showSuccess(message) {
+    // Create or update success display
+    let successDiv = document.getElementById('success-message');
+    if (!successDiv) {
+      successDiv = document.createElement('div');
+      successDiv.id = 'success-message';
+      successDiv.className = 'success-message';
+      successDiv.style.cssText = 'background: #d4edda; color: #155724; padding: 12px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #c3e6cb;';
+      document.querySelector('.task-container').prepend(successDiv);
+    }
+    successDiv.textContent = message;
+    successDiv.style.display = 'block';
+
+    // Hide success message after 3 seconds
+    setTimeout(() => {
+      successDiv.style.display = 'none';
+    }, 3000);
   }
 }
 

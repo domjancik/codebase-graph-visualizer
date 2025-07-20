@@ -24,6 +24,7 @@
                 <option value="">All Projects</option>
             </select>
             <button id="refreshBtn">🔄 Refresh</button>
+            <button id="addTaskBtn" class="btn-add-task">➕ Add Task</button>
         </div>
     </div>
 
@@ -104,11 +105,71 @@
                     <div class="info-section">
                         <h4>🎯 Actions</h4>
                         <div class="action-buttons">
+                            <button class="btn-execute" id="execute-task">▶️ Execute Task</button>
                             <button class="btn-view-graph" id="view-in-graph">View in Graph</button>
                             <button class="btn-copy-id" id="copy-task-id">Copy Task ID</button>
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Task Modal -->
+    <div id="add-task-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>➕ Create New Task</h2>
+                <span class="close" id="close-add-task-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="add-task-form">
+                    <div class="form-group">
+                        <label for="task-name">Task Name *</label>
+                        <input type="text" id="task-name" name="name" required placeholder="Enter task name...">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="task-description">Description</label>
+                        <textarea id="task-description" name="description" placeholder="Describe the task..." rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="task-status">Status</label>
+                            <select id="task-status" name="status">
+                                <option value="TODO">Todo</option>
+                                <option value="IN_PROGRESS">In Progress</option>
+                                <option value="DONE">Done</option>
+                                <option value="BLOCKED">Blocked</option>
+                                <option value="CANCELLED">Cancelled</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="task-progress">Progress (%)</label>
+                            <input type="number" id="task-progress" name="progress" min="0" max="100" value="0">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="task-project">Project (optional)</label>
+                        <select id="task-project" name="project">
+                            <option value="">Select project...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="task-command">Command/Action (optional)</label>
+                        <input type="text" id="task-command" name="command" placeholder="e.g., npm test, git commit, deploy...">
+                        <small>Command to execute when this task is triggered</small>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" id="cancel-task" class="btn-cancel">Cancel</button>
+                        <button type="submit" class="btn-create">Create Task</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
