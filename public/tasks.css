@@ -286,6 +286,14 @@
   border-radius: 4px;
   font-size: 0.8rem;
   color: #495057;
+  cursor: help;
+  transition: background-color 0.2s ease;
+  border: 1px solid #dee2e6;
+}
+
+.component-tag:hover {
+  background: #dee2e6;
+  border-color: #ced4da;
 }
 
 .no-components {

@@ -247,9 +247,16 @@ class TaskManager {
       if (task.relatedComponentIds && task.relatedComponentIds.length > 0) {
         modalComponents.innerHTML = '';
         task.relatedComponentIds.forEach(componentId => {
+          const component = this.components.find(c => c.id === componentId);
           const componentElement = document.createElement('span');
           componentElement.className = 'component-tag';
-          componentElement.textContent = componentId;
+          componentElement.textContent = component ? component.name : componentId;
+          
+          // Add tooltip with additional info if component found
+          if (component) {
+            componentElement.title = `${component.componentType || component.type} - ${component.codebase || 'Unknown project'}`;
+          }
+          
           modalComponents.appendChild(componentElement);
         });
       } else {
