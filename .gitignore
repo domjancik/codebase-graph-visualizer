@@ -83,7 +83,8 @@ dist
 
 # Gatsby files
 .cache/
-public
+# Note: We include our public/ folder since it contains our web assets
+# public
 
 # Vuepress build output
 .vuepress/dist
