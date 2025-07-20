@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codebase Graph Visualizer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 Codebase Graph Visualizer</h1>
+        <div class="controls">
+            <select id="codebaseSelect">
+                <option value="">All Codebases</option>
+            </select>
+            <button id="refreshBtn">🔄 Refresh</button>
+            <button id="centerBtn">🎯 Center</button>
+            <button id="exportBtn">💾 Export</button>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="panel">
+                <h3>📊 Statistics</h3>
+                <div id="statistics">
+                    <div class="stat-item">
+                        <span class="stat-label">Components:</span>
+                        <span class="stat-value" id="componentCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Tasks:</span>
+                        <span class="stat-value" id="taskCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Relationships:</span>
+                        <span class="stat-value" id="relationshipCount">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>🔧 Filters</h3>
+                <div id="filters">
+                    <div class="filter-group">
+                        <label>Component Types:</label>
+                        <div id="componentTypeFilters" class="checkbox-group"></div>
+                    </div>
+                    <div class="filter-group">
+                        <label>Relationship Types:</label>
+                        <div id="relationshipTypeFilters" class="checkbox-group"></div>
+                    </div>
+                    <div class="filter-group">
+                        <label>Task Status:</label>
+                        <div id="taskStatusFilters" class="checkbox-group"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>🎨 Layout</h3>
+                <div class="layout-controls">
+                    <label>Force Strength:</label>
+                    <input type="range" id="forceStrength" min="0" max="200" value="100">
+                    <label>Link Distance:</label>
+                    <input type="range" id="linkDistance" min="30" max="300" value="100">
+                    <label>Charge:</label>
+                    <input type="range" id="charge" min="-500" max="0" value="-200">
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>ℹ️ Selection Info</h3>
+                <div id="selectionInfo">
+                    <p>Click on a node to see details</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="visualization-container">
+            <div id="graph"></div>
+            <div class="legend">
+                <h4>Legend</h4>
+                <div class="legend-section">
+                    <h5>Component Types</h5>
+                    <div class="legend-items" id="componentLegend"></div>
+                </div>
+                <div class="legend-section">
+                    <h5>Relationship Types</h5>
+                    <div class="legend-items" id="relationshipLegend"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tooltip" class="tooltip"></div>
+
+    <script src="visualization.js"></script>
+</body>
+</html>
