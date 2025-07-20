@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager - Codebase Graph Visualizer</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="tasks.css">
+</head>
+<body>
+    <div class="header">
+        <h1>📋 Task Manager</h1>
+        <div class="controls">
+            <a href="/" class="nav-link">🔍 Graph View</a>
+            <select id="statusFilter">
+                <option value="">All Tasks</option>
+                <option value="TODO">Todo</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="DONE">Done</option>
+                <option value="BLOCKED">Blocked</option>
+                <option value="CANCELLED">Cancelled</option>
+            </select>
+            <button id="refreshBtn">🔄 Refresh</button>
+        </div>
+    </div>
+
+    <div class="task-container">
+        <div class="task-board">
+            <div class="task-column" data-status="TODO">
+                <div class="column-header">
+                    <h3>📝 Todo</h3>
+                    <span class="task-count" id="todo-count">0</span>
+                </div>
+                <div class="task-list" id="todo-tasks"></div>
+            </div>
+
+            <div class="task-column" data-status="IN_PROGRESS">
+                <div class="column-header">
+                    <h3>⚡ In Progress</h3>
+                    <span class="task-count" id="in-progress-count">0</span>
+                </div>
+                <div class="task-list" id="in-progress-tasks"></div>
+            </div>
+
+            <div class="task-column" data-status="DONE">
+                <div class="column-header">
+                    <h3>✅ Done</h3>
+                    <span class="task-count" id="done-count">0</span>
+                </div>
+                <div class="task-list" id="done-tasks"></div>
+            </div>
+
+            <div class="task-column" data-status="BLOCKED">
+                <div class="column-header">
+                    <h3>🚫 Blocked</h3>
+                    <span class="task-count" id="blocked-count">0</span>
+                </div>
+                <div class="task-list" id="blocked-tasks"></div>
+            </div>
+
+            <div class="task-column" data-status="CANCELLED">
+                <div class="column-header">
+                    <h3>❌ Cancelled</h3>
+                    <span class="task-count" id="cancelled-count">0</span>
+                </div>
+                <div class="task-list" id="cancelled-tasks"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Detail Modal -->
+    <div id="task-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-task-name">Task Details</h2>
+                <span class="close" id="close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="task-info">
+                    <div class="info-section">
+                        <h4>📊 Status & Progress</h4>
+                        <div class="status-badge" id="modal-status">TODO</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="modal-progress"></div>
+                        </div>
+                        <span class="progress-text" id="modal-progress-text">0%</span>
+                    </div>
+
+                    <div class="info-section" id="description-section">
+                        <h4>📝 Description</h4>
+                        <p id="modal-description">No description available</p>
+                    </div>
+
+                    <div class="info-section" id="components-section">
+                        <h4>🔗 Related Components</h4>
+                        <div class="component-list" id="modal-components">
+                            <p class="no-components">No related components</p>
+                        </div>
+                    </div>
+
+                    <div class="info-section">
+                        <h4>🎯 Actions</h4>
+                        <div class="action-buttons">
+                            <button class="btn-view-graph" id="view-in-graph">View in Graph</button>
+                            <button class="btn-copy-id" id="copy-task-id">Copy Task ID</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="tasks.js"></script>
+</body>
+</html>

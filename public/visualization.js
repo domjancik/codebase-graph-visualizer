@@ -69,6 +69,56 @@ class GraphVisualizer {
     this.initializeEventListeners();
     this.loadData();
   }
+
+  async loadTasks() {
+    try {
+      const response = await fetch('/api/graph');
+      const data = await response.json();
+      const taskNodes = data.nodes.filter(node => node.type === 'task');
+      this.renderTasks(taskNodes);
+    } catch (error) {
+      console.error('Error loading tasks:', error);
+    }
+  }
+
+  renderTasks(tasks) {
+    const columns = {
+      TODO: document.getElementById('todo-tasks'),
+      IN_PROGRESS: document.getElementById('in-progress-tasks'),
+      DONE: document.getElementById('done-tasks'),
+      BLOCKED: document.getElementById('blocked-tasks'),
+      CANCELLED: document.getElementById('cancelled-tasks')
+    };
+
+    Object.keys(columns).forEach(status => columns[status].innerHTML = '');
+
+    tasks.forEach(task => {
+      const taskElement = document.createElement('div');
+      taskElement.className = 'task-item';
+      taskElement.textContent = task.name;
+      columns[task.status].appendChild(taskElement);
+    });
+
+    this.updateTaskCounts(tasks);
+  }
+
+  updateTaskCounts(tasks) {
+    const counts = {
+      TODO: 0,
+      IN_PROGRESS: 0,
+      DONE: 0,
+      BLOCKED: 0,
+      CANCELLED: 0
+    };
+
+    tasks.forEach(task => counts[task.status]++);
+
+    document.getElementById('todo-count').textContent = counts.TODO;
+    document.getElementById('in-progress-count').textContent = counts.IN_PROGRESS;
+    document.getElementById('done-count').textContent = counts.DONE;
+    document.getElementById('blocked-count').textContent = counts.BLOCKED;
+    document.getElementById('cancelled-count').textContent = counts.CANCELLED;
+  }
   
   initializeEventListeners() {
     // Control buttons
