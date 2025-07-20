@@ -1,0 +1,32 @@
+{
+  "name": "codebase-graph-visualizer",
+  "version": "1.0.0",
+  "description": "Web-based visualization tool for codebase graphs stored in Neo4j",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "demo": "node demo.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "neo4j-driver": "^5.15.0",
+    "cors": "^2.8.5",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0"
+  },
+  "keywords": [
+    "visualization",
+    "graph",
+    "neo4j",
+    "codebase",
+    "d3",
+    "web"
+  ],
+  "author": "Agent",
+  "license": "MIT"
+}
