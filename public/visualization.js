@@ -68,6 +68,9 @@ class GraphVisualizer {
     
     this.initializeEventListeners();
     this.loadData();
+    
+    // Check for highlight parameter in URL
+    this.checkHighlightParameter();
   }
 
   async loadTasks() {
@@ -532,6 +535,55 @@ class GraphVisualizer {
       `;
       relationshipLegend.appendChild(item);
     });
+  }
+
+  checkHighlightParameter() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const highlightId = urlParams.get('highlight');
+    
+    if (highlightId) {
+      // Wait for data to load then highlight the node
+      setTimeout(() => this.highlightNode(highlightId), 1000);
+    }
+  }
+
+  highlightNode(nodeId) {
+    if (!this.filteredData.nodes || this.filteredData.nodes.length === 0) {
+      // Data not loaded yet, try again later
+      setTimeout(() => this.highlightNode(nodeId), 500);
+      return;
+    }
+    
+    const nodeToHighlight = this.filteredData.nodes.find(node => node.id === nodeId);
+    if (nodeToHighlight) {
+      // Select the node
+      this.selectNode(nodeToHighlight);
+      
+      // Center the view on this node
+      setTimeout(() => {
+        if (nodeToHighlight.x && nodeToHighlight.y) {
+          const transform = d3.zoomIdentity
+            .translate(this.width / 2 - nodeToHighlight.x, this.height / 2 - nodeToHighlight.y)
+            .scale(1.5);
+          
+          this.svg.transition().duration(750).call(
+            d3.zoom().transform,
+            transform
+          );
+        }
+      }, 500);
+      
+      // Add pulsing effect
+      this.node.filter(d => d.id === nodeId)
+        .style('stroke', '#ff0000')
+        .style('stroke-width', '3px')
+        .transition()
+        .duration(1000)
+        .style('stroke-width', '6px')
+        .transition()
+        .duration(1000)
+        .style('stroke-width', '3px');
+    }
   }
 }
 

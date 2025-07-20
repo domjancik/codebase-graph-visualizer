@@ -2,9 +2,11 @@
 class TaskManager {
   constructor() {
     this.tasks = [];
+    this.components = [];
     this.currentTask = null;
     this.filters = {
-      status: ''
+      status: '',
+      project: ''
     };
 
     this.initializeEventListeners();
@@ -23,6 +25,15 @@ class TaskManager {
     if (statusFilter) {
       statusFilter.addEventListener('change', (e) => {
         this.filters.status = e.target.value;
+        this.renderTasks();
+      });
+    }
+
+    // Project filter
+    const projectFilter = document.getElementById('projectFilter');
+    if (projectFilter) {
+      projectFilter.addEventListener('change', (e) => {
+        this.filters.project = e.target.value;
         this.renderTasks();
       });
     }
@@ -47,9 +58,11 @@ class TaskManager {
       const response = await fetch('/api/graph');
       const data = await response.json();
       this.tasks = data.nodes.filter(node => node.type === 'task');
+      this.components = data.nodes.filter(node => node.type === 'component');
       
       console.log('Loaded tasks:', this.tasks); // Debug log
       
+      this.populateProjectFilter();
       this.renderTasks();
     } catch (error) {
       console.error('Error loading tasks:', error);
@@ -58,10 +71,63 @@ class TaskManager {
     }
   }
 
+  populateProjectFilter() {
+    // Extract unique projects from related components
+    const projects = new Set();
+    
+    this.tasks.forEach(task => {
+      if (task.relatedComponentIds && task.relatedComponentIds.length > 0) {
+        task.relatedComponentIds.forEach(componentId => {
+          const component = this.components.find(c => c.id === componentId);
+          if (component && component.codebase) {
+            projects.add(component.codebase);
+          }
+        });
+      }
+    });
+
+    // Also get projects directly from components
+    this.components.forEach(component => {
+      if (component.codebase) {
+        projects.add(component.codebase);
+      }
+    });
+
+    const projectFilter = document.getElementById('projectFilter');
+    if (projectFilter) {
+      // Clear existing options except "All Projects"
+      projectFilter.innerHTML = '<option value="">All Projects</option>';
+      
+      // Add project options
+      Array.from(projects).sort().forEach(project => {
+        const option = document.createElement('option');
+        option.value = project;
+        option.textContent = project;
+        projectFilter.appendChild(option);
+      });
+    }
+  }
+
   renderTasks() {
-    const filteredTasks = this.filters.status 
-      ? this.tasks.filter(task => task.status === this.filters.status)
-      : this.tasks;
+    let filteredTasks = this.tasks;
+    
+    // Apply status filter
+    if (this.filters.status) {
+      filteredTasks = filteredTasks.filter(task => task.status === this.filters.status);
+    }
+    
+    // Apply project filter
+    if (this.filters.project) {
+      filteredTasks = filteredTasks.filter(task => {
+        if (!task.relatedComponentIds || task.relatedComponentIds.length === 0) {
+          return false;
+        }
+        return task.relatedComponentIds.some(componentId => {
+          const component = this.components.find(c => c.id === componentId);
+          return component && component.codebase === this.filters.project;
+        });
+      });
+    }
 
     // Clear all columns
     const columns = {
@@ -86,7 +152,7 @@ class TaskManager {
       }
     });
 
-    this.updateTaskCounts();
+    this.updateTaskCounts(filteredTasks);
   }
 
   createTaskElement(task) {
@@ -115,7 +181,7 @@ class TaskManager {
     return taskDiv;
   }
 
-  updateTaskCounts() {
+  updateTaskCounts(filteredTasks) {
     const counts = {
       'TODO': 0,
       'IN_PROGRESS': 0,
@@ -123,10 +189,6 @@ class TaskManager {
       'BLOCKED': 0,
       'CANCELLED': 0
     };
-
-    const filteredTasks = this.filters.status 
-      ? this.tasks.filter(task => task.status === this.filters.status)
-      : this.tasks;
 
     filteredTasks.forEach(task => {
       if (counts.hasOwnProperty(task.status)) {
