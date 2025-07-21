@@ -55,6 +55,12 @@ class GraphVisualizerServer {
     this.app.post('/api/tasks', this.createTask.bind(this));
     this.app.post('/api/tasks/execute', this.executeTask.bind(this));
     this.app.put('/api/tasks/:id/status', this.updateTaskStatus.bind(this));
+    
+    // Comment management endpoints
+    this.app.get('/api/nodes/:id/comments', this.getNodeComments.bind(this));
+    this.app.post('/api/nodes/:id/comments', this.createComment.bind(this));
+    this.app.put('/api/comments/:id', this.updateComment.bind(this));
+    this.app.delete('/api/comments/:id', this.deleteComment.bind(this));
   }
 
   async healthCheck(req, res) {
@@ -416,6 +422,127 @@ class GraphVisualizerServer {
       res.json({ types });
     } catch (error) {
       console.error('Error fetching relationship types:', error);
+      res.status(500).json({ error: error.message });
+    } finally {
+      await session.close();
+    }
+  }
+
+  // ============================================================================
+  // COMMENT MANAGEMENT METHODS
+  // ============================================================================
+
+  async getNodeComments(req, res) {
+    const { id } = req.params;
+    const session = this.driver.session();
+    
+    try {
+      const result = await session.run(`
+        MATCH (n)-[:HAS_COMMENT]->(c:Comment)
+        WHERE n.id = $id
+        RETURN c
+        ORDER BY c.timestamp DESC
+      `, { id });
+      
+      const comments = result.records.map(record => record.get('c').properties);
+      res.json(comments);
+    } catch (error) {
+      console.error('Error fetching node comments:', error);
+      res.status(500).json({ error: error.message });
+    } finally {
+      await session.close();
+    }
+  }
+
+  async createComment(req, res) {
+    const { id: nodeId } = req.params;
+    const { content, author = 'system' } = req.body;
+    const session = this.driver.session();
+
+    try {
+      const commentId = `comment_${Date.now()}`;
+      const timestamp = new Date().toISOString();
+      
+      // Create comment and link to node
+      const result = await session.run(`
+        MATCH (n) WHERE n.id = $nodeId
+        CREATE (c:Comment {
+          id: $commentId,
+          content: $content,
+          author: $author,
+          timestamp: $timestamp
+        })
+        CREATE (n)-[:HAS_COMMENT]->(c)
+        RETURN c, n
+      `, { nodeId, commentId, content, author, timestamp });
+      
+      if (result.records.length === 0) {
+        return res.status(404).json({ error: 'Node not found' });
+      }
+      
+      const comment = result.records[0].get('c').properties;
+      const node = result.records[0].get('n').properties;
+      
+      res.status(201).json({ 
+        comment,
+        message: `Comment added to ${node.name || node.id}` 
+      });
+    } catch (error) {
+      console.error('Error creating comment:', error);
+      res.status(500).json({ error: error.message });
+    } finally {
+      await session.close();
+    }
+  }
+
+  async updateComment(req, res) {
+    const { id } = req.params;
+    const { content } = req.body;
+    const session = this.driver.session();
+
+    try {
+      const updatedTimestamp = new Date().toISOString();
+      
+      const result = await session.run(`
+        MATCH (c:Comment {id: $id})
+        SET c.content = $content, c.updatedAt = $updatedTimestamp
+        RETURN c
+      `, { id, content, updatedTimestamp });
+      
+      if (result.records.length === 0) {
+        return res.status(404).json({ error: 'Comment not found' });
+      }
+      
+      const comment = result.records[0].get('c').properties;
+      res.json({ comment, message: 'Comment updated successfully' });
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      res.status(500).json({ error: error.message });
+    } finally {
+      await session.close();
+    }
+  }
+
+  async deleteComment(req, res) {
+    const { id } = req.params;
+    const session = this.driver.session();
+
+    try {
+      const result = await session.run(`
+        MATCH (c:Comment {id: $id})
+        DETACH DELETE c
+        RETURN count(c) as deleted
+      `, { id });
+      
+      const deleted = result.records[0].get('deleted').toNumber();
+      
+      if (deleted === 0) {
+        return res.status(404).json({ error: 'Comment not found' });
+      }
+      
+      res.json({ message: 'Comment deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting comment:', error);
       res.status(500).json({ error: error.message });
     } finally {
       await session.close();
