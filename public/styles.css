@@ -323,6 +323,46 @@ body {
     opacity: 1;
 }
 
+/* Notification system */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0,0,0,0.9);
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    max-width: 400px;
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all 0.3s ease;
+    z-index: 2000;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    line-height: 1.4;
+}
+
+.notification.visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.notification.info {
+    background: linear-gradient(135deg, #2196F3, #1976D2);
+}
+
+.notification.warning {
+    background: linear-gradient(135deg, #FF9800, #F57C00);
+}
+
+.notification.error {
+    background: linear-gradient(135deg, #F44336, #D32F2F);
+}
+
+.notification.success {
+    background: linear-gradient(135deg, #4CAF50, #388E3C);
+}
+
 /* Graph styles */
 .node {
     stroke: #fff;

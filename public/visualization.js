@@ -656,9 +656,124 @@ class GraphVisualizer {
     const highlightId = urlParams.get('highlight');
     
     if (highlightId) {
-      // Wait for data to load then highlight the node
-      setTimeout(() => this.highlightNode(highlightId), 1000);
+      // Wait for data to load then highlight the node with smooth animation
+      setTimeout(() => this.highlightNodeWithAnimation(highlightId), 1000);
     }
+  }
+  
+  highlightNodeWithAnimation(nodeId) {
+    if (!this.filteredData.nodes || this.filteredData.nodes.length === 0) {
+      // Data not loaded yet, try again later
+      setTimeout(() => this.highlightNodeWithAnimation(nodeId), 500);
+      return;
+    }
+    
+    const nodeToHighlight = this.filteredData.nodes.find(node => node.id === nodeId);
+    if (!nodeToHighlight) {
+      // Check if node exists but is filtered out
+      const hiddenNode = this.data.nodes.find(node => node.id === nodeId);
+      if (hiddenNode) {
+        console.warn(`Node "${hiddenNode.name}" is currently hidden by filters`);
+        // Show a subtle notification instead of an alert
+        this.showNotification(`Node "${hiddenNode.name}" is currently hidden by filters. Adjust filters to see it.`, 'warning');
+      } else {
+        console.warn(`Node with ID ${nodeId} not found`);
+        this.showNotification(`Node with ID ${nodeId} not found.`, 'error');
+      }
+      return;
+    }
+    
+    // First, select the node
+    this.selectNode(nodeToHighlight);
+    
+    // Wait for the node to have position data from simulation
+    const animateToNode = () => {
+      if (nodeToHighlight.x && nodeToHighlight.y) {
+        // Calculate the transform to center the node with some zoom
+        const scale = 1.5;
+        const translateX = this.width / 2 - nodeToHighlight.x * scale;
+        const translateY = this.height / 2 - nodeToHighlight.y * scale;
+        
+        const transform = d3.zoomIdentity
+          .translate(translateX, translateY)
+          .scale(scale);
+        
+        // Smooth animated transition to center the node
+        this.svg.transition()
+          .duration(1500)
+          .ease(d3.easeCubicInOut)
+          .call(
+            d3.zoom().transform,
+            transform
+          );
+          
+        // Add pulsing highlight effect
+        setTimeout(() => {
+          this.addPulsingEffect(nodeId);
+        }, 500);
+      } else {
+        // Node doesn't have position yet, wait a bit more
+        setTimeout(animateToNode, 100);
+      }
+    };
+    
+    // Start the animation after a short delay
+    setTimeout(animateToNode, 300);
+  }
+  
+  addPulsingEffect(nodeId) {
+    const targetNode = this.node.filter(d => d.id === nodeId);
+    if (targetNode.empty()) return;
+    
+    // Create a series of pulsing animations
+    const pulse = () => {
+      targetNode
+        .transition()
+        .duration(600)
+        .ease(d3.easeQuadInOut)
+        .style('stroke', '#ff6b6b')
+        .style('stroke-width', '6px')
+        .transition()
+        .duration(600)
+        .ease(d3.easeQuadInOut)
+        .style('stroke-width', '4px')
+        .on('end', function(d, i) {
+          // Only continue pulsing for the first node in the selection
+          if (i === 0) {
+            setTimeout(pulse, 200);
+          }
+        });
+    };
+    
+    // Start pulsing and stop after a few cycles
+    pulse();
+    setTimeout(() => {
+      targetNode
+        .transition()
+        .duration(400)
+        .style('stroke', '#ff6b6b')
+        .style('stroke-width', '4px');
+    }, 3000);
+  }
+  
+  showNotification(message, type = 'info') {
+    // Create notification element if it doesn't exist
+    let notification = document.getElementById('notification');
+    if (!notification) {
+      notification = document.createElement('div');
+      notification.id = 'notification';
+      notification.className = 'notification';
+      document.body.appendChild(notification);
+    }
+    
+    // Set message and type
+    notification.textContent = message;
+    notification.className = `notification ${type} visible`;
+    
+    // Auto-hide after 4 seconds
+    setTimeout(() => {
+      notification.classList.remove('visible');
+    }, 4000);
   }
 
   selectAndFocusNodeById(nodeId) {
