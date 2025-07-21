@@ -58,11 +58,36 @@ body {
 }
 
 .sidebar {
-    width: 300px;
+    position: relative;
+    width: var(--sidebar-width, 300px);
+    min-width: 200px;
+    max-width: 500px;
     background: white;
     border-right: 1px solid #e1e1e1;
     overflow-y: auto;
     box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+    transition: width 0.2s ease-in-out;
+}
+
+.sidebar.resizing {
+    transition: none;
+    user-select: none;
+}
+
+.sidebar-resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 4px;
+    height: 100%;
+    cursor: col-resize;
+    background: transparent;
+    z-index: 10;
+    transition: background-color 0.2s ease;
+}
+
+.sidebar-resize-handle:hover {
+    background: rgba(102, 126, 234, 0.3);
 }
 
 .panel {
