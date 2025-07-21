@@ -72,6 +72,7 @@ class GraphVisualizer {
     };
     
     this.initializeEventListeners();
+    this.setupResizableSidebar();
     this.loadDynamicTypes().then(() => {
       this.loadData();
     });
@@ -156,6 +157,77 @@ class GraphVisualizer {
       this.simulation.force('charge').strength(e.target.value);
       this.simulation.alpha(0.3).restart();
     });
+  }
+  
+  setupResizableSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const resizeHandle = document.getElementById('sidebarResizeHandle');
+    
+    if (!sidebar || !resizeHandle) {
+      console.warn('Sidebar or resize handle not found');
+      return;
+    }
+    
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+    
+    // Mouse down on resize handle
+    resizeHandle.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      startX = e.clientX;
+      startWidth = parseInt(getComputedStyle(sidebar).width, 10);
+      
+      // Add resizing class to disable transitions and text selection
+      sidebar.classList.add('resizing');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      
+      e.preventDefault();
+    });
+    
+    // Mouse move anywhere in document
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+      
+      const width = startWidth + (e.clientX - startX);
+      const minWidth = 200;
+      const maxWidth = window.innerWidth * 0.5; // 50% of viewport width
+      
+      // Clamp width within bounds
+      const clampedWidth = Math.min(Math.max(width, minWidth), maxWidth);
+      
+      // Update sidebar width using CSS custom property
+      document.documentElement.style.setProperty('--sidebar-width', clampedWidth + 'px');
+      
+      // Update graph width and simulation center
+      this.width = document.getElementById('graph').clientWidth;
+      this.svg.attr('width', this.width);
+      this.simulation.force('center', d3.forceCenter(this.width / 2, this.height / 2));
+      this.simulation.alpha(0.1).restart();
+      
+      e.preventDefault();
+    });
+    
+    // Mouse up anywhere in document
+    document.addEventListener('mouseup', () => {
+      if (!isResizing) return;
+      
+      isResizing = false;
+      sidebar.classList.remove('resizing');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      
+      // Save the width to localStorage
+      const currentWidth = getComputedStyle(sidebar).width;
+      localStorage.setItem('sidebarWidth', currentWidth);
+    });
+    
+    // Load saved width from localStorage
+    const savedWidth = localStorage.getItem('sidebarWidth');
+    if (savedWidth) {
+      document.documentElement.style.setProperty('--sidebar-width', savedWidth);
+    }
   }
   
   async loadDynamicTypes() {
@@ -451,6 +523,38 @@ class GraphVisualizer {
     this.updateSelectionInfo(node);
   }
   
+  async loadNodeComments(nodeId) {
+    try {
+      const response = await fetch(`/api/nodes/${nodeId}/comments`);
+      if (!response.ok) {
+        throw new Error('Failed to load comments');
+      }
+      const comments = await response.json();
+      if (!comments.length) return '<p>No comments yet.</p>';
+    
+      let commentsHtml = '<div class="comments-section">';
+      commentsHtml += '<h5>💬 Comments</h5>';
+    
+      comments.forEach(comment => {
+        commentsHtml += `
+          <div class="comment-item">
+            <div class="comment-meta">
+              <span class="comment-author">${comment.author}</span>
+              <span class="comment-timestamp">${new Date(comment.timestamp).toLocaleString()}</span>
+            </div>
+            <div class="comment-content">${comment.content}</div>
+          </div>
+        `;
+      });
+
+      commentsHtml += '</div>';
+      return commentsHtml;
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      return '<p>Error loading comments.</p>';
+    }
+  }
+
   renderMarkdown(text) {
     if (!text || typeof text !== 'string') {
       return text || '';
@@ -592,6 +696,9 @@ class GraphVisualizer {
       }
     }
     
+    // Load comments for this node
+    const commentsHtml = await this.loadNodeComments(node.id);
+    
     const html = `
       <h4>${node.name}</h4>
       <div class="info-item">
@@ -634,6 +741,7 @@ class GraphVisualizer {
       ` : ''}
       ${this.formatMetadata(node)}
       ${relationshipsHtml}
+      ${commentsHtml}
     `;
     
     info.innerHTML = html;
