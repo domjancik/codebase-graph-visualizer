@@ -231,6 +231,78 @@ body {
     font-weight: 500;
 }
 
+/* Relationships section */
+.relationships-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #f0f0f0;
+}
+
+.relationships-section h5 {
+    margin-bottom: 0.75rem;
+    color: #333;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.relationship-group {
+    margin-bottom: 1rem;
+}
+
+.relationship-group h6 {
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.relationship-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+    padding: 0.25rem 0;
+}
+
+.relationship-direction {
+    font-weight: bold;
+    color: #666;
+    min-width: 16px;
+    text-align: center;
+}
+
+.relationship-target {
+    color: #333;
+    cursor: help;
+    word-break: break-word;
+}
+
+.relationship-target:hover {
+    color: #2196F3;
+    text-decoration: underline;
+}
+
+.relationship-target.clickable {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 3px;
+    padding: 2px 4px;
+    margin: -2px -4px;
+}
+
+.relationship-target.clickable:hover {
+    background-color: #e3f2fd;
+    color: #1976D2;
+    font-weight: 500;
+}
+
+.relationship-more {
+    font-style: italic;
+    color: #888;
+    font-size: 0.7rem;
+    margin-top: 0.25rem;
+}
+
 /* Tooltip */
 .tooltip {
     position: absolute;

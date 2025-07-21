@@ -16,8 +16,8 @@ class GraphVisualizer {
     this.container = this.svg;
     this.tooltip = d3.select('#tooltip');
     
-    // Color schemes
-    this.componentColors = {
+    // Default color schemes - will be dynamically expanded
+    this.defaultComponentColors = {
       'FILE': '#4CAF50',
       'FUNCTION': '#2196F3',
       'CLASS': '#FF9800',
@@ -36,7 +36,7 @@ class GraphVisualizer {
       'CANCELLED': '#607D8B'
     };
     
-    this.relationshipColors = {
+    this.defaultRelationshipColors = {
       'DEPENDS_ON': '#F44336',
       'IMPLEMENTS': '#4CAF50',
       'EXTENDS': '#FF9800',
@@ -46,8 +46,13 @@ class GraphVisualizer {
       'EXPORTS': '#8BC34A',
       'OVERRIDES': '#795548',
       'USES': '#607D8B',
-      'CREATES': '#E91E63'
+      'CREATES': '#E91E63',
+      'RELATES_TO': '#9E9E9E'
     };
+    
+    // Dynamic colors will be populated from server data
+    this.componentColors = { ...this.defaultComponentColors };
+    this.relationshipColors = { ...this.defaultRelationshipColors };
     
     // Simulation
     this.simulation = d3.forceSimulation()
@@ -67,7 +72,9 @@ class GraphVisualizer {
     };
     
     this.initializeEventListeners();
-    this.loadData();
+    this.loadDynamicTypes().then(() => {
+      this.loadData();
+    });
     
     // Check for highlight parameter in URL
     this.checkHighlightParameter();
@@ -148,6 +155,56 @@ class GraphVisualizer {
     document.getElementById('charge').addEventListener('input', (e) => {
       this.simulation.force('charge').strength(e.target.value);
       this.simulation.alpha(0.3).restart();
+    });
+  }
+  
+  async loadDynamicTypes() {
+    try {
+      // Load all available component types
+      const componentTypesResponse = await fetch('/api/node-types');
+      if (componentTypesResponse.ok) {
+        const { types } = await componentTypesResponse.json();
+        this.updateComponentColors(types.flat());
+      }
+      
+      // Load all available relationship types
+      const relationshipTypesResponse = await fetch('/api/relationship-types');
+      if (relationshipTypesResponse.ok) {
+        const { types } = await relationshipTypesResponse.json();
+        this.updateRelationshipColors(types);
+      }
+    } catch (error) {
+      console.warn('Could not load dynamic types, using defaults:', error);
+    }
+  }
+  
+  updateComponentColors(types) {
+    const additionalColors = [
+      '#607D8B', '#795548', '#E91E63', '#673AB7', '#3F51B5',
+      '#009688', '#FFC107', '#FF5722', '#9C27B0', '#00BCD4'
+    ];
+    
+    let colorIndex = 0;
+    types.forEach(type => {
+      if (!this.componentColors[type]) {
+        this.componentColors[type] = additionalColors[colorIndex % additionalColors.length];
+        colorIndex++;
+      }
+    });
+  }
+  
+  updateRelationshipColors(types) {
+    const additionalColors = [
+      '#424242', '#FF6F00', '#1B5E20', '#4A148C', '#B71C1C',
+      '#006064', '#F57F17', '#BF360C', '#4A148C', '#01579B'
+    ];
+    
+    let colorIndex = 0;
+    types.forEach(type => {
+      if (!this.relationshipColors[type]) {
+        this.relationshipColors[type] = additionalColors[colorIndex % additionalColors.length];
+        colorIndex++;
+      }
     });
   }
   
@@ -394,12 +451,48 @@ class GraphVisualizer {
     this.updateSelectionInfo(node);
   }
   
-  updateSelectionInfo(node) {
+  async updateSelectionInfo(node) {
     const info = document.getElementById('selectionInfo');
     
     if (!node) {
       info.innerHTML = '<p>Click on a node to see details</p>';
       return;
+    }
+    
+    let relationshipsHtml = '';
+    if (node.type === 'component') {
+      try {
+        const response = await fetch(`/api/components/${node.id}/relationships`);
+        if (response.ok) {
+          const relationships = await response.json();
+          if (relationships && relationships.length > 0) {
+            const groupedRelationships = this.groupRelationships(relationships);
+            relationshipsHtml = '<div class="relationships-section">';
+            relationshipsHtml += '<h5>🔗 Relationships</h5>';
+            
+            Object.entries(groupedRelationships).forEach(([relType, rels]) => {
+              relationshipsHtml += `<div class="relationship-group">`;
+              relationshipsHtml += `<h6 style="color: ${this.relationshipColors[relType] || '#999'}">${relType} (${rels.length})</h6>`;
+              
+              rels.slice(0, 5).forEach(rel => {
+                const arrow = rel.direction === 'outgoing' ? '→' : '←';
+                relationshipsHtml += `<div class="relationship-item">`;
+                relationshipsHtml += `<span class="relationship-direction">${arrow}</span>`;
+                relationshipsHtml += `<span class="relationship-target clickable" data-node-id="${rel.target.id}" title="Click to select and focus this node. ${rel.target.description || ''}">${rel.target.name}</span>`;
+                relationshipsHtml += `</div>`;
+              });
+              
+              if (rels.length > 5) {
+                relationshipsHtml += `<div class="relationship-more">... and ${rels.length - 5} more</div>`;
+              }
+              relationshipsHtml += `</div>`;
+            });
+            relationshipsHtml += '</div>';
+          }
+        }
+      } catch (error) {
+        console.warn('Could not load relationships for node:', error);
+      }
     }
     
     const html = `
@@ -442,9 +535,30 @@ class GraphVisualizer {
           <span>${node.description}</span>
         </div>
       ` : ''}
+      ${relationshipsHtml}
     `;
     
     info.innerHTML = html;
+    
+    // Add event listeners for clickable relationship targets
+    info.querySelectorAll('.relationship-target.clickable').forEach(target => {
+      target.addEventListener('click', (e) => {
+        e.preventDefault();
+        const nodeId = e.target.getAttribute('data-node-id');
+        this.selectAndFocusNodeById(nodeId);
+      });
+    });
+  }
+  
+  groupRelationships(relationships) {
+    const grouped = {};
+    relationships.forEach(rel => {
+      if (!grouped[rel.type]) {
+        grouped[rel.type] = [];
+      }
+      grouped[rel.type].push(rel);
+    });
+    return grouped;
   }
   
   showTooltip(event, node) {
@@ -547,6 +661,57 @@ class GraphVisualizer {
     }
   }
 
+  selectAndFocusNodeById(nodeId) {
+    if (!this.filteredData.nodes || this.filteredData.nodes.length === 0) {
+      console.warn('No nodes available to select from');
+      return;
+    }
+    
+    // First, try to find the node in filtered data
+    let nodeToSelect = this.filteredData.nodes.find(node => node.id === nodeId);
+    
+    // If not found in filtered data, check if it's in the full dataset but filtered out
+    if (!nodeToSelect) {
+      nodeToSelect = this.data.nodes.find(node => node.id === nodeId);
+      if (nodeToSelect) {
+        // Node exists but is filtered out - show a message
+        alert(`The node "${nodeToSelect.name}" is currently hidden by filters. Please adjust your filters to see this node.`);
+        return;
+      } else {
+        console.warn(`Node with ID ${nodeId} not found`);
+        return;
+      }
+    }
+    
+    // Select the node
+    this.selectNode(nodeToSelect);
+    
+    // Center the view on this node with animation
+    setTimeout(() => {
+      if (nodeToSelect.x && nodeToSelect.y) {
+        const transform = d3.zoomIdentity
+          .translate(this.width / 2 - nodeToSelect.x, this.height / 2 - nodeToSelect.y)
+          .scale(1.2);
+        
+        this.svg.transition().duration(750).call(
+          d3.zoom().transform,
+          transform
+        );
+      }
+    }, 200);
+    
+    // Add pulsing effect to highlight the node
+    this.node.filter(d => d.id === nodeId)
+      .style('stroke', '#ff6b6b')
+      .style('stroke-width', '4px')
+      .transition()
+      .duration(500)
+      .style('stroke-width', '6px')
+      .transition()
+      .duration(500)
+      .style('stroke-width', '4px');
+  }
+  
   highlightNode(nodeId) {
     if (!this.filteredData.nodes || this.filteredData.nodes.length === 0) {
       // Data not loaded yet, try again later
@@ -554,36 +719,8 @@ class GraphVisualizer {
       return;
     }
     
-    const nodeToHighlight = this.filteredData.nodes.find(node => node.id === nodeId);
-    if (nodeToHighlight) {
-      // Select the node
-      this.selectNode(nodeToHighlight);
-      
-      // Center the view on this node
-      setTimeout(() => {
-        if (nodeToHighlight.x && nodeToHighlight.y) {
-          const transform = d3.zoomIdentity
-            .translate(this.width / 2 - nodeToHighlight.x, this.height / 2 - nodeToHighlight.y)
-            .scale(1.5);
-          
-          this.svg.transition().duration(750).call(
-            d3.zoom().transform,
-            transform
-          );
-        }
-      }, 500);
-      
-      // Add pulsing effect
-      this.node.filter(d => d.id === nodeId)
-        .style('stroke', '#ff0000')
-        .style('stroke-width', '3px')
-        .transition()
-        .duration(1000)
-        .style('stroke-width', '6px')
-        .transition()
-        .duration(1000)
-        .style('stroke-width', '3px');
-    }
+    // Use the new method for consistency
+    this.selectAndFocusNodeById(nodeId);
   }
 }
 

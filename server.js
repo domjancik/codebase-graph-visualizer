@@ -48,6 +48,8 @@ class GraphVisualizerServer {
     this.app.get('/api/tasks', this.getTasks.bind(this));
     this.app.get('/api/overview/:codebase', this.getCodebaseOverview.bind(this));
     this.app.get('/api/dependency-tree/:componentId', this.getDependencyTree.bind(this));
+    this.app.get('/api/node-types', this.getNodeTypes.bind(this));
+    this.app.get('/api/relationship-types', this.getRelationshipTypes.bind(this));
     
     // Task management endpoints
     this.app.post('/api/tasks', this.createTask.bind(this));
@@ -381,6 +383,38 @@ class GraphVisualizerServer {
       res.json(dependencies);
     } catch (error) {
       console.error('Error fetching dependency tree:', error);
+      res.status(500).json({ error: error.message });
+    } finally {
+      await session.close();
+    }
+  }
+
+  async getNodeTypes(req, res) {
+    const session = this.driver.session();
+    try {
+      const result = await session.run(`
+        MATCH (n) WHERE n:Component RETURN DISTINCT labels(n) as type
+      `);
+      const types = result.records.map(record => record.get('type'));
+      res.json({ types });
+    } catch (error) {
+      console.error('Error fetching types:', error);
+      res.status(500).json({ error: error.message });
+    } finally {
+      await session.close();
+    }
+  }
+
+  async getRelationshipTypes(req, res) {
+    const session = this.driver.session();
+    try {
+      const result = await session.run(`
+        MATCH ()-[r]->() RETURN DISTINCT type(r) as type
+      `);
+      const types = result.records.map(record => record.get('type'));
+      res.json({ types });
+    } catch (error) {
+      console.error('Error fetching relationship types:', error);
       res.status(500).json({ error: error.message });
     } finally {
       await session.close();

@@ -127,3 +127,6 @@ logs
 # Temporary files
 tmp/
 temp/
+
+# Test files
+test-*.json
