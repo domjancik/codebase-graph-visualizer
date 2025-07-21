@@ -357,6 +357,17 @@ class TaskManager {
       copyTaskIdBtn.onclick = () => this.copyTaskId(task);
     }
 
+    // Load and display comments
+    this.loadTaskComments(task.id);
+    
+    // Set up comment form
+    const addCommentBtn = document.getElementById('add-comment');
+    const newCommentTextarea = document.getElementById('new-comment');
+    
+    if (addCommentBtn) {
+      addCommentBtn.onclick = () => this.addComment(task.id, newCommentTextarea);
+    }
+    
     if (modal) {
       modal.style.display = 'block';
     }
@@ -580,6 +591,94 @@ class TaskManager {
     setTimeout(() => {
       successDiv.style.display = 'none';
     }, 3000);
+  }
+
+  // ============================================================================
+  // COMMENT MANAGEMENT METHODS
+  // ============================================================================
+
+  async loadTaskComments(taskId) {
+    try {
+      const response = await fetch(`/api/nodes/${taskId}/comments`);
+      if (!response.ok) {
+        throw new Error('Failed to load comments');
+      }
+      const comments = await response.json();
+      this.displayComments(comments);
+    } catch (error) {
+      console.error('Error loading comments:', error);
+      this.displayComments([]);
+    }
+  }
+
+  displayComments(comments) {
+    const commentsContainer = document.getElementById('task-comments');
+    if (!commentsContainer) return;
+
+    if (!comments.length) {
+      commentsContainer.innerHTML = '<p class="no-comments">No comments yet.</p>';
+      return;
+    }
+
+    let commentsHtml = '';
+    comments.forEach(comment => {
+      commentsHtml += `
+        <div class="comment-item">
+          <div class="comment-meta">
+            <span class="comment-author">${comment.author}</span>
+            <span class="comment-timestamp">${new Date(comment.timestamp).toLocaleString()}</span>
+          </div>
+          <div class="comment-content">${comment.content}</div>
+        </div>
+      `;
+    });
+
+    commentsContainer.innerHTML = commentsHtml;
+  }
+
+  async addComment(taskId, textarea) {
+    const content = textarea.value.trim();
+    if (!content) {
+      alert('Please enter a comment');
+      return;
+    }
+
+    try {
+      const addButton = document.getElementById('add-comment');
+      if (addButton) {
+        addButton.disabled = true;
+        addButton.textContent = 'Adding...';
+      }
+
+      const response = await fetch(`/api/nodes/${taskId}/comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          content: content,
+          author: 'user' // Could be made dynamic
+        })
+      });
+
+      if (response.ok) {
+        textarea.value = ''; // Clear the textarea
+        this.loadTaskComments(taskId); // Reload comments
+        this.showSuccess('Comment added successfully!');
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to add comment');
+      }
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      this.showError('Failed to add comment: ' + error.message);
+    } finally {
+      const addButton = document.getElementById('add-comment');
+      if (addButton) {
+        addButton.disabled = false;
+        addButton.textContent = 'Add Comment';
+      }
+    }
   }
 }
 
