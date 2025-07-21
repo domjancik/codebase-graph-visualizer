@@ -5,6 +5,7 @@ import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import neo4j from 'neo4j-driver';
+import MCPServer from './mcp-server.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -25,6 +26,8 @@ class GraphVisualizerServer {
 
     this.setupMiddleware();
     this.setupRoutes();
+    // Initialize MCP Server
+    this.mcpServer = new MCPServer(this.driver);
   }
 
   setupMiddleware() {
@@ -45,6 +48,7 @@ class GraphVisualizerServer {
     this.app.get('/api/graph/:codebase', this.getCodebaseGraph.bind(this));
     this.app.get('/api/components', this.getComponents.bind(this));
     this.app.get('/api/components/:id/relationships', this.getComponentRelationships.bind(this));
+    this.app.post('/api/mcp', this.handleMCPRequest.bind(this));
     this.app.get('/api/tasks', this.getTasks.bind(this));
     this.app.get('/api/overview/:codebase', this.getCodebaseOverview.bind(this));
     this.app.get('/api/dependency-tree/:componentId', this.getDependencyTree.bind(this));
@@ -55,6 +59,17 @@ class GraphVisualizerServer {
     this.app.post('/api/tasks', this.createTask.bind(this));
     this.app.post('/api/tasks/execute', this.executeTask.bind(this));
     this.app.put('/api/tasks/:id/status', this.updateTaskStatus.bind(this));
+  }
+
+  async handleMCPRequest(req, res) {
+    const { toolName, params } = req.body;
+    try {
+      const result = await this.mcpServer.handleRequest(toolName, params);
+      res.json(result);
+    } catch (error) {
+      console.error('Error handling MCP request:', error);
+      res.status(500).json({ error: error.message });
+    }
   }
 
   async healthCheck(req, res) {
@@ -91,7 +106,7 @@ class GraphVisualizerServer {
       const tasksResult = await session.run(`
         MATCH (t:Task)
         OPTIONAL MATCH (t)-[:RELATES_TO]->(c:Component)
-        RETURN t, collect(c.id) as relatedComponentIds
+        RETURN t, collect(c.id) as relatedComponentIds, collect(c) as relatedComponents
       `);
 
       const components = componentsResult.records.map(record => {
@@ -115,6 +130,7 @@ class GraphVisualizerServer {
       const tasks = tasksResult.records.map(record => ({
         ...record.get('t').properties,
         relatedComponentIds: record.get('relatedComponentIds'),
+        relatedComponents: record.get('relatedComponents').map(c => c.properties),
         type: 'task'
       }));
 

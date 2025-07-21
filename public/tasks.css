@@ -313,25 +313,34 @@
   gap: 10px;
 }
 
-.btn-view-graph,
-.btn-copy-id {
+  .btn-view-graph {
     padding: 0.5rem 1rem;
     border: none;
     border-radius: 6px;
-    background: rgba(255,255,255,0.2);
+    background: #28a745;
     color: white;
     cursor: pointer;
     font-size: 0.9rem;
     transition: all 0.2s ease;
+  }
+
+.btn-view-graph:hover {
+    background: #218838;
 }
 
-.btn-view-graph:hover, .btn-copy-id:hover {
-    background: rgba(255,255,255,0.3);
+.btn-copy-id:hover {
+    background: #545b62;
 }
 
 .btn-copy-id {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
   background: #6c757d;
   color: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
 }
 
 .btn-copy-id:hover {

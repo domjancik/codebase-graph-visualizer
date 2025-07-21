@@ -13,6 +13,42 @@ class TaskManager {
     this.loadTasks();
   }
 
+  renderMarkdown(text) {
+    if (!text || typeof text !== 'string') {
+      return text || '';
+    }
+    
+    try {
+      // Configure marked with safe defaults and syntax highlighting
+      if (typeof marked !== 'undefined') {
+        // Configure marked options
+        marked.setOptions({
+          breaks: true, // Support line breaks
+          gfm: true,    // GitHub Flavored Markdown
+          sanitize: false, // We'll sanitize manually if needed
+          highlight: function(code, lang) {
+            if (typeof Prism !== 'undefined' && lang && Prism.languages[lang]) {
+              try {
+                return Prism.highlight(code, Prism.languages[lang], lang);
+              } catch (e) {
+                console.warn('Prism highlighting failed:', e);
+              }
+            }
+            return code;
+          }
+        });
+        
+        return marked.parse(text);
+      } else {
+        // Fallback if marked is not available - just return plain text with basic formatting
+        return text.replace(/\n/g, '<br>');
+      }
+    } catch (error) {
+      console.warn('Markdown rendering failed:', error);
+      return text.replace(/\n/g, '<br>');
+    }
+  }
+
   initializeEventListeners() {
     // Refresh button
     const refreshBtn = document.getElementById('refreshBtn');
@@ -143,13 +179,21 @@ class TaskManager {
     // Apply project filter
     if (this.filters.project) {
       filteredTasks = filteredTasks.filter(task => {
-        if (!task.relatedComponentIds || task.relatedComponentIds.length === 0) {
-          return false;
+        // First check if task has a direct codebase property
+        if (task.codebase === this.filters.project) {
+          return true;
         }
-        return task.relatedComponentIds.some(componentId => {
-          const component = this.components.find(c => c.id === componentId);
-          return component && component.codebase === this.filters.project;
-        });
+        
+        // Then check related components
+        if (task.relatedComponentIds && task.relatedComponentIds.length > 0) {
+          return task.relatedComponentIds.some(componentId => {
+            const component = this.components.find(c => c.id === componentId);
+            return component && component.codebase === this.filters.project;
+          });
+        }
+        
+        // If task has no codebase and no related components, exclude it
+        return false;
       });
     }
 
@@ -263,7 +307,11 @@ class TaskManager {
     }
 
     if (modalDescription) {
-      modalDescription.textContent = task.description || 'No description available';
+      if (task.description) {
+        modalDescription.innerHTML = `<div class="markdown-content">${this.renderMarkdown(task.description)}</div>`;
+      } else {
+        modalDescription.textContent = 'No description available';
+      }
     }
 
     // Handle related components

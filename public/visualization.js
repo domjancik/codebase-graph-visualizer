@@ -451,6 +451,103 @@ class GraphVisualizer {
     this.updateSelectionInfo(node);
   }
   
+  renderMarkdown(text) {
+    if (!text || typeof text !== 'string') {
+      return text || '';
+    }
+    
+    try {
+      // Configure marked with safe defaults and syntax highlighting
+      if (typeof marked !== 'undefined') {
+        const renderer = new marked.Renderer();
+        
+        // Configure marked options
+        marked.setOptions({
+          breaks: true, // Support line breaks
+          gfm: true,    // GitHub Flavored Markdown
+          sanitize: false, // We'll sanitize manually if needed
+          highlight: function(code, lang) {
+            if (typeof Prism !== 'undefined' && lang && Prism.languages[lang]) {
+              try {
+                return Prism.highlight(code, Prism.languages[lang], lang);
+              } catch (e) {
+                console.warn('Prism highlighting failed:', e);
+              }
+            }
+            return code;
+          }
+        });
+        
+        return marked.parse(text);
+      } else {
+        // Fallback if marked is not available - just return plain text with basic formatting
+        return text.replace(/\n/g, '<br>');
+      }
+    } catch (error) {
+      console.warn('Markdown rendering failed:', error);
+      return text.replace(/\n/g, '<br>');
+    }
+  }
+
+  formatMetadata(node) {
+    // Get all properties of the node, excluding basic fields already shown
+    const excludedFields = new Set([
+      'id', 'name', 'type', 'componentType', 'codebase', 'path', 
+      'description', 'status', 'progress', 'x', 'y', 'fx', 'fy', 
+      'index', 'vx', 'vy'
+    ]);
+    
+    const metadataEntries = [];
+    
+    // Collect all extra properties
+    for (const [key, value] of Object.entries(node)) {
+      if (!excludedFields.has(key) && value !== null && value !== undefined && value !== '') {
+        metadataEntries.push([key, value]);
+      }
+    }
+    
+    if (metadataEntries.length === 0) {
+      return '';
+    }
+    
+    let metadataHtml = '<div class="metadata-section">';
+    metadataHtml += '<h5>📋 Additional Metadata</h5>';
+    
+    metadataEntries.forEach(([key, value]) => {
+      // Format key to be more readable
+      const displayKey = key.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim()
+        .split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+      
+      let displayValue;
+      if (typeof value === 'object') {
+        // For objects/arrays, show pretty JSON
+        displayValue = `<pre class="metadata-json">${JSON.stringify(value, null, 2)}</pre>`;
+      } else if (typeof value === 'string' && value.includes(',')) {
+        // For comma-separated strings, show as a list
+        const items = value.split(',').map(item => item.trim()).filter(item => item);
+        if (items.length > 1) {
+          displayValue = '<ul class="metadata-list">' + 
+            items.map(item => `<li>${item}</li>`).join('') + 
+            '</ul>';
+        } else {
+          displayValue = value;
+        }
+      } else {
+        displayValue = String(value);
+      }
+      
+      metadataHtml += `
+        <div class="metadata-item">
+          <span class="metadata-key">${displayKey}:</span>
+          <div class="metadata-value">${displayValue}</div>
+        </div>
+      `;
+    });
+    
+    metadataHtml += '</div>';
+    return metadataHtml;
+  }
+
   async updateSelectionInfo(node) {
     const info = document.getElementById('selectionInfo');
     
@@ -532,9 +629,10 @@ class GraphVisualizer {
       ${node.description ? `
         <div class="info-item">
           <span class="info-label">Description:</span>
-          <span>${node.description}</span>
+          <div class="markdown-content">${this.renderMarkdown(node.description)}</div>
         </div>
       ` : ''}
+      ${this.formatMetadata(node)}
       ${relationshipsHtml}
     `;
     
