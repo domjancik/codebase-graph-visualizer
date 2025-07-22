@@ -560,12 +560,13 @@ class GraphVisualizerServer {
 
   // Helper method to generate grid positions
   generateGridPosition(index, cols, nodeWidth, nodeHeight) {
-    const padding = 50;
+    const padding = 50; // Space between nodes
+    const canvasPadding = 50; // Canvas padding is handled by CSS
     const col = index % cols;
     const row = Math.floor(index / cols);
     return {
-      x: padding + col * (nodeWidth + padding),
-      y: padding + row * (nodeHeight + padding)
+      x: col * (nodeWidth + padding), // No additional offset needed - CSS handles canvas padding
+      y: row * (nodeHeight + padding)
     };
   }
 
