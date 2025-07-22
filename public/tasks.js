@@ -8,8 +8,16 @@ class TaskManager {
       status: '',
       project: ''
     };
+    
+    // Auto-refresh settings
+    this.autoRefreshInterval = null;
+    this.autoRefreshDelay = 30000; // 30 seconds default
+    this.isAutoRefreshEnabled = true;
+    this.lastUpdateTime = null;
+    this.isLoading = false;
 
     this.initializeEventListeners();
+    this.setupAutoRefresh();
     this.loadTasks();
   }
 
@@ -678,6 +686,304 @@ class TaskManager {
         addButton.disabled = false;
         addButton.textContent = 'Add Comment';
       }
+    }
+  }
+
+  // ============================================================================
+  // AUTO-REFRESH METHODS
+  // ============================================================================
+
+  setupAutoRefresh() {
+    // Add auto-refresh controls to the page
+    this.createAutoRefreshControls();
+    
+    // Start auto-refresh if enabled
+    if (this.isAutoRefreshEnabled) {
+      this.startAutoRefresh();
+    }
+    
+    // Listen for visibility changes to pause/resume auto-refresh
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.pauseAutoRefresh();
+      } else if (this.isAutoRefreshEnabled) {
+        this.resumeAutoRefresh();
+      }
+    });
+  }
+
+  createAutoRefreshControls() {
+    const header = document.querySelector('.header');
+    if (!header) return;
+
+    // Create auto-refresh status indicator
+    const autoRefreshContainer = document.createElement('div');
+    autoRefreshContainer.className = 'auto-refresh-controls';
+    autoRefreshContainer.innerHTML = `
+      <div class="auto-refresh-status">
+        <span id="refresh-status" class="refresh-indicator">
+          <span class="refresh-dot"></span>
+          <span id="refresh-text">Auto-refresh: ON</span>
+        </span>
+        <span id="last-update" class="last-update-time"></span>
+      </div>
+      <div class="auto-refresh-buttons">
+        <button id="toggle-auto-refresh" class="toggle-btn" title="Toggle auto-refresh">
+          <span id="toggle-icon">⏸️</span>
+        </button>
+        <select id="refresh-interval" class="interval-select" title="Set refresh interval">
+          <option value="15000">15s</option>
+          <option value="30000" selected>30s</option>
+          <option value="60000">1m</option>
+          <option value="300000">5m</option>
+          <option value="600000">10m</option>
+        </select>
+      </div>
+    `;
+
+    // Insert after the main header
+    header.insertAdjacentElement('afterend', autoRefreshContainer);
+
+    // Add event listeners
+    this.setupAutoRefreshEventListeners();
+    
+    // Update initial display
+    this.updateRefreshStatus();
+  }
+
+  setupAutoRefreshEventListeners() {
+    // Toggle auto-refresh
+    const toggleBtn = document.getElementById('toggle-auto-refresh');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => this.toggleAutoRefresh());
+    }
+
+    // Change refresh interval
+    const intervalSelect = document.getElementById('refresh-interval');
+    if (intervalSelect) {
+      intervalSelect.addEventListener('change', (e) => {
+        this.autoRefreshDelay = parseInt(e.target.value);
+        if (this.isAutoRefreshEnabled) {
+          this.restartAutoRefresh();
+        }
+      });
+    }
+  }
+
+  startAutoRefresh() {
+    if (this.autoRefreshInterval) {
+      clearInterval(this.autoRefreshInterval);
+    }
+
+    this.autoRefreshInterval = setInterval(() => {
+      this.refreshTasks();
+    }, this.autoRefreshDelay);
+
+    this.isAutoRefreshEnabled = true;
+    this.updateRefreshStatus();
+  }
+
+  stopAutoRefresh() {
+    if (this.autoRefreshInterval) {
+      clearInterval(this.autoRefreshInterval);
+      this.autoRefreshInterval = null;
+    }
+
+    this.isAutoRefreshEnabled = false;
+    this.updateRefreshStatus();
+  }
+
+  pauseAutoRefresh() {
+    if (this.autoRefreshInterval) {
+      clearInterval(this.autoRefreshInterval);
+      this.autoRefreshInterval = null;
+    }
+  }
+
+  resumeAutoRefresh() {
+    if (this.isAutoRefreshEnabled && !this.autoRefreshInterval) {
+      this.startAutoRefresh();
+    }
+  }
+
+  restartAutoRefresh() {
+    this.stopAutoRefresh();
+    this.startAutoRefresh();
+  }
+
+  toggleAutoRefresh() {
+    if (this.isAutoRefreshEnabled) {
+      this.stopAutoRefresh();
+    } else {
+      this.startAutoRefresh();
+    }
+  }
+
+  async refreshTasks() {
+    if (this.isLoading) return;
+    
+    try {
+      this.isLoading = true;
+      this.updateRefreshStatus(true);
+      
+      const response = await fetch('/api/graph');
+      const data = await response.json();
+      const newTasks = data.nodes.filter(node => node.type === 'task');
+      const newComponents = data.nodes.filter(node => node.type === 'component');
+      
+      // Check if there are any changes
+      const hasChanges = this.hasTaskChanges(newTasks);
+      
+      this.tasks = newTasks;
+      this.components = newComponents;
+      
+      // Only re-render if there are changes
+      if (hasChanges) {
+        this.populateProjectFilter();
+        this.renderTasks();
+        this.showRefreshNotification();
+      }
+      
+      this.lastUpdateTime = new Date();
+      
+    } catch (error) {
+      console.error('Auto-refresh error:', error);
+      // Don't show error for auto-refresh failures, just log them
+    } finally {
+      this.isLoading = false;
+      this.updateRefreshStatus();
+    }
+  }
+
+  hasTaskChanges(newTasks) {
+    if (this.tasks.length !== newTasks.length) {
+      return true;
+    }
+    
+    // Check for changes in existing tasks
+    for (let i = 0; i < newTasks.length; i++) {
+      const newTask = newTasks[i];
+      const oldTask = this.tasks.find(t => t.id === newTask.id);
+      
+      if (!oldTask) {
+        return true; // New task
+      }
+      
+      // Check key fields that would trigger a visual update
+      if (oldTask.status !== newTask.status ||
+          oldTask.progress !== newTask.progress ||
+          oldTask.name !== newTask.name ||
+          oldTask.description !== newTask.description) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  updateRefreshStatus(isRefreshing = false) {
+    const refreshText = document.getElementById('refresh-text');
+    const refreshDot = document.querySelector('.refresh-dot');
+    const toggleIcon = document.getElementById('toggle-icon');
+    const lastUpdateElement = document.getElementById('last-update');
+
+    if (refreshText) {
+      if (isRefreshing) {
+        refreshText.textContent = 'Refreshing...';
+      } else {
+        refreshText.textContent = `Auto-refresh: ${this.isAutoRefreshEnabled ? 'ON' : 'OFF'}`;
+      }
+    }
+
+    if (refreshDot) {
+      refreshDot.className = `refresh-dot ${
+        isRefreshing ? 'refreshing' : 
+        this.isAutoRefreshEnabled ? 'active' : 'inactive'
+      }`;
+    }
+
+    if (toggleIcon) {
+      toggleIcon.textContent = this.isAutoRefreshEnabled ? '⏸️' : '▶️';
+    }
+
+    if (lastUpdateElement && this.lastUpdateTime) {
+      const timeAgo = this.getTimeAgo(this.lastUpdateTime);
+      lastUpdateElement.textContent = `Updated ${timeAgo}`;
+    }
+  }
+
+  showRefreshNotification() {
+    // Create a subtle notification for successful refresh
+    let notification = document.getElementById('refresh-notification');
+    if (!notification) {
+      notification = document.createElement('div');
+      notification.id = 'refresh-notification';
+      notification.className = 'refresh-notification';
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #28a745;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 4px;
+        font-size: 14px;
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+      `;
+      document.body.appendChild(notification);
+    }
+
+    notification.textContent = 'Tasks updated';
+    notification.style.opacity = '1';
+
+    setTimeout(() => {
+      notification.style.opacity = '0';
+    }, 2000);
+  }
+
+  getTimeAgo(date) {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffInSeconds < 60) {
+      return `${diffInSeconds}s ago`;
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `${minutes}m ago`;
+    } else {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `${hours}h ago`;
+    }
+  }
+
+  // Override the existing loadTasks to update timestamp
+  async loadTasks() {
+    try {
+      this.isLoading = true;
+      this.updateRefreshStatus(true);
+      
+      const response = await fetch('/api/graph');
+      const data = await response.json();
+      this.tasks = data.nodes.filter(node => node.type === 'task');
+      this.components = data.nodes.filter(node => node.type === 'component');
+      
+      console.log('Loaded tasks:', this.tasks); // Debug log
+      
+      this.populateProjectFilter();
+      this.renderTasks();
+      
+      this.lastUpdateTime = new Date();
+      
+    } catch (error) {
+      console.error('Error loading tasks:', error);
+      // Show error message to user
+      this.showError('Failed to load tasks. Please check your connection.');
+    } finally {
+      this.isLoading = false;
+      this.updateRefreshStatus();
     }
   }
 }
