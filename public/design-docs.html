@@ -58,6 +58,32 @@
                         <label>Connection Types:</label>
                         <div id="connectionTypeFilters" class="checkbox-group"></div>
                     </div>
+                    <div class="filter-group">
+                        <label>Time & Probability:</label>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="showTimeLabels" checked>
+                            <label for="showTimeLabels">Show Time Order</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="showProbabilityLabels" checked>
+                            <label for="showProbabilityLabels">Show Probability</label>
+                        </div>
+                        <div class="range-item">
+                            <label for="probabilityRange">Probability Range:</label>
+                            <input type="range" id="minProbability" min="0" max="100" value="0">
+                            <span id="minProbText">0%</span> - 
+                            <input type="range" id="maxProbability" min="0" max="100" value="100">
+                            <span id="maxProbText">100%</span>
+                        </div>
+                        <div class="select-item">
+                            <label for="timeOrderFilter">Time Order:</label>
+                            <select id="timeOrderFilter">
+                                <option value="all">All</option>
+                                <option value="chronological">Chronological</option>
+                                <option value="reverse">Reverse</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -65,11 +91,13 @@
                 <h3>🎨 Layout</h3>
                 <div class="layout-controls">
                     <label>Grid Size:</label>
-                    <input type="range" id="gridSize" min="100" max="500" value="200">
+                    <input type="range" id="gridSize" min="100" max="1000" value="200">
                     <label>Node Width:</label>
                     <input type="range" id="nodeWidth" min="200" max="500" value="300">
                     <label>Node Height:</label>
                     <input type="range" id="nodeHeight" min="150" max="400" value="200">
+                    <label>Node Gap:</label>
+                    <input type="range" id="nodeGap" min="10" max="150" value="50">
                 </div>
             </div>
 
