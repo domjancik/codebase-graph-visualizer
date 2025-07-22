@@ -10,7 +10,9 @@ class DesignDocsVisualization {
         this.config = {
             nodeWidth: 300,
             nodeHeight: 200,
-            gridSize: 200
+            gridSize: 200,
+            nodeGap: 50,
+            canvasPadding: 100  // Padding around the entire canvas
         };
         
         // Document type colors
@@ -32,7 +34,19 @@ class DesignDocsVisualization {
             'REFINES': '#00BCD4',
             'TRACES_TO': '#795548',
             'VALIDATES': '#607D8B',
-            'VERIFIES': '#E91E63'
+            'VERIFIES': '#E91E63',
+            'PRECEDES': '#8E24AA',
+            'FOLLOWS': '#5C6BC0',
+            'CONCURRENT': '#26A69A'
+        };
+        
+        // Filters for time and probability
+        this.filters = {
+            showTimeLabels: true,
+            showProbabilityLabels: true,
+            minProbability: 0,
+            maxProbability: 100,
+            timeOrderFilter: 'all' // all, chronological, reverse
         };
         
         this.initializeVisualization();
@@ -88,6 +102,11 @@ class DesignDocsVisualization {
             this.updateLayout();
         });
         
+        document.getElementById('nodeGap')?.addEventListener('input', (e) => {
+            this.config.nodeGap = parseInt(e.target.value);
+            this.updateLayout();
+        });
+        
         // Refresh button
         document.getElementById('refreshBtn')?.addEventListener('click', () => {
             this.loadData();
@@ -101,6 +120,35 @@ class DesignDocsVisualization {
         // Export button
         document.getElementById('exportBtn')?.addEventListener('click', () => {
             this.exportData();
+        });
+        
+        // Time and probability filter controls
+        document.getElementById('showTimeLabels')?.addEventListener('change', (e) => {
+            this.filters.showTimeLabels = e.target.checked;
+            this.renderVisualization();
+        });
+        
+        document.getElementById('showProbabilityLabels')?.addEventListener('change', (e) => {
+            this.filters.showProbabilityLabels = e.target.checked;
+            this.renderVisualization();
+        });
+        
+        document.getElementById('minProbability')?.addEventListener('input', (e) => {
+            this.filters.minProbability = parseInt(e.target.value);
+            document.getElementById('minProbText').textContent = e.target.value + '%';
+            this.renderVisualization();
+        });
+        
+        document.getElementById('maxProbability')?.addEventListener('input', (e) => {
+            this.filters.maxProbability = parseInt(e.target.value);
+            document.getElementById('maxProbText').textContent = e.target.value + '%';
+            this.renderVisualization();
+        });
+        
+        document.getElementById('timeOrderFilter')?.addEventListener('change', (e) => {
+            this.filters.timeOrderFilter = e.target.value;
+            this.applyTimeOrderFilter();
+            this.renderVisualization();
         });
     }
     
@@ -161,7 +209,14 @@ class DesignDocsVisualization {
     
     createNodeElement(node) {
         const nodeDiv = document.createElement('div');
-        nodeDiv.className = `doc-node doc-type-${node.componentType?.toLowerCase() || 'unknown'}`;
+        let className = `doc-node doc-type-${node.componentType?.toLowerCase() || 'unknown'}`;
+        
+        // Add 'wide' class for nodes 300px or wider to enable horizontal header layout
+        if (this.config.nodeWidth >= 300) {
+            className += ' wide';
+        }
+        
+        nodeDiv.className = className;
         nodeDiv.style.position = 'absolute';
         nodeDiv.style.top = node.position.y + 'px';
         nodeDiv.style.left = node.position.x + 'px';
@@ -221,6 +276,12 @@ class DesignDocsVisualization {
         
         if (!sourceNode || !targetNode) return;
         
+        // Filter by probability if specified
+        if (link.probability !== undefined && 
+            (link.probability < this.filters.minProbability || link.probability > this.filters.maxProbability)) {
+            return;
+        }
+        
         // Calculate connection points
         const sourceX = sourceNode.position.x + this.config.nodeWidth / 2;
         const sourceY = sourceNode.position.y + this.config.nodeHeight / 2;
@@ -230,17 +291,42 @@ class DesignDocsVisualization {
         // Create orthogonal path (90-degree turns)
         const path = this.createOrthogonalPath(sourceX, sourceY, targetX, targetY);
         
+        // Style connection based on probability
+        let strokeWidth = '2px';
+        let strokeOpacity = 1;
+        if (link.probability !== undefined) {
+            strokeWidth = `${Math.max(1, Math.floor(link.probability / 25) + 1)}px`;
+            strokeOpacity = Math.max(0.3, link.probability / 100);
+        }
+        
         const connection = this.svg.append('path')
             .attr('d', path)
             .attr('class', `connection-line connection-${link.type.toLowerCase()}`)
             .attr('marker-end', 'url(#arrowhead)')
             .style('stroke', this.connectionColors[link.type] || '#999')
-            .style('stroke-width', '2px')
+            .style('stroke-width', strokeWidth)
+            .style('stroke-opacity', strokeOpacity)
             .style('fill', 'none');
         
-        // Add label
+        // Add main label
         const midX = (sourceX + targetX) / 2;
         const midY = (sourceY + targetY) / 2;
+        
+        // Build label text with optional time and probability
+        let labelText = link.type.replace('_', ' ');
+        const additionalLabels = [];
+        
+        if (this.filters.showTimeLabels && link.timeOrder) {
+            additionalLabels.push(`T${link.timeOrder}`);
+        }
+        
+        if (this.filters.showProbabilityLabels && link.probability !== undefined) {
+            additionalLabels.push(`${link.probability}%`);
+        }
+        
+        if (additionalLabels.length > 0) {
+            labelText += ` (${additionalLabels.join(', ')})`;
+        }
         
         this.svg.append('text')
             .attr('x', midX)
@@ -249,7 +335,20 @@ class DesignDocsVisualization {
             .style('font-size', '10px')
             .style('fill', '#666')
             .style('text-anchor', 'middle')
-            .text(link.type.replace('_', ' '));
+            .text(labelText);
+            
+        // Add reasoning label if present
+        if (link.reasoning) {
+            this.svg.append('text')
+                .attr('x', midX)
+                .attr('y', midY + 10)
+                .attr('class', 'connection-reasoning')
+                .style('font-size', '8px')
+                .style('fill', '#888')
+                .style('text-anchor', 'middle')
+                .style('font-style', 'italic')
+                .text(link.reasoning.length > 30 ? link.reasoning.substring(0, 30) + '...' : link.reasoning);
+        }
     }
     
     createOrthogonalPath(x1, y1, x2, y2) {
@@ -338,14 +437,36 @@ class DesignDocsVisualization {
         }
     }
     
+    applyTimeOrderFilter() {
+        // Apply time-based filtering and sorting
+        if (this.filters.timeOrderFilter === 'chronological') {
+            // Sort connections by time order and filter nodes accordingly
+            this.filteredData.links = this.data.links
+                .filter(link => link.timeOrder !== undefined)
+                .sort((a, b) => (a.timeOrder || 0) - (b.timeOrder || 0));
+        } else if (this.filters.timeOrderFilter === 'reverse') {
+            this.filteredData.links = this.data.links
+                .filter(link => link.timeOrder !== undefined)
+                .sort((a, b) => (b.timeOrder || 0) - (a.timeOrder || 0));
+        } else {
+            // Show all links
+            this.filteredData.links = [...this.data.links];
+        }
+    }
+    
     updateLayout() {
-        // Re-position nodes based on grid
+        // Calculate columns based on grid size (how many nodes fit per row)
+        const totalSpacePerNode = this.config.nodeWidth + this.config.nodeGap;
+        const columnsFromGridSize = Math.max(1, Math.floor(this.config.gridSize / totalSpacePerNode));
+        const columns = Math.max(1, columnsFromGridSize);
+        
+        // Re-position nodes based on grid with proper padding and spacing
         this.filteredData.nodes.forEach((node, index) => {
-            const col = index % 3;
-            const row = Math.floor(index / 3);
+            const col = index % columns;
+            const row = Math.floor(index / columns);
             node.position = {
-                x: 50 + col * (this.config.nodeWidth + 50),
-                y: 50 + row * (this.config.nodeHeight + 50)
+                x: this.config.canvasPadding + col * (this.config.nodeWidth + this.config.nodeGap),
+                y: this.config.canvasPadding + row * (this.config.nodeHeight + this.config.nodeGap)
             };
         });
         
