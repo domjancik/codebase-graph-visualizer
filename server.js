@@ -45,6 +45,8 @@ class GraphVisualizerServer {
     this.app.get('/api/graph/:codebase', this.getCodebaseGraph.bind(this));
     this.app.get('/api/components', this.getComponents.bind(this));
     this.app.get('/api/components/:id/relationships', this.getComponentRelationships.bind(this));
+    this.app.get('/api/design-docs', this.getDesignDocs.bind(this));
+    this.app.get('/api/design-docs/:codebase', this.getDesignDocsByCodebase.bind(this));
     this.app.get('/api/tasks', this.getTasks.bind(this));
     this.app.get('/api/overview/:codebase', this.getCodebaseOverview.bind(this));
     this.app.get('/api/dependency-tree/:componentId', this.getDependencyTree.bind(this));
@@ -411,12 +413,11 @@ class GraphVisualizerServer {
       await session.close();
     }
   }
-
   async getRelationshipTypes(req, res) {
     const session = this.driver.session();
     try {
       const result = await session.run(`
-        MATCH ()-[r]->() RETURN DISTINCT type(r) as type
+        MATCH ()-[r]-> () RETURN DISTINCT type(r) as type
       `);
       const types = result.records.map(record => record.get('type'));
       res.json({ types });
@@ -426,6 +427,146 @@ class GraphVisualizerServer {
     } finally {
       await session.close();
     }
+  }
+
+  async getDesignDocs(req, res) {
+    const session = this.driver.session();
+    try {
+      // Get design document components (SPECIFICATION, REQUIREMENT, FEATURE, USER_STORY, ACCEPTANCE_CRITERIA)
+      const componentsResult = await session.run(`
+        MATCH (c:Component)
+        WHERE c.type IN ['SPECIFICATION', 'REQUIREMENT', 'FEATURE', 'USER_STORY', 'ACCEPTANCE_CRITERIA']
+        RETURN c
+        ORDER BY c.codebase, c.name
+      `);
+
+      // Get all relationships between design document components
+      const relationshipsResult = await session.run(`
+        MATCH (source:Component)-[r]->(target:Component)
+        WHERE source.type IN ['SPECIFICATION', 'REQUIREMENT', 'FEATURE', 'USER_STORY', 'ACCEPTANCE_CRITERIA']
+          AND target.type IN ['SPECIFICATION', 'REQUIREMENT', 'FEATURE', 'USER_STORY', 'ACCEPTANCE_CRITERIA']
+          AND type(r) <> 'RELATES_TO'
+        RETURN source.id as sourceId, target.id as targetId, 
+               type(r) as type, r as relationship,
+               source.name as sourceName, target.name as targetName
+      `);
+
+      const components = componentsResult.records.map((record, index) => {
+        const props = record.get('c').properties;
+        return {
+          ...props,
+          type: 'component',
+          componentType: props.type,
+          // Auto-generate grid positions if not set
+          position: props.position || this.generateGridPosition(index, 3, 350, 250)
+        };
+      });
+
+      const relationships = relationshipsResult.records.map(record => ({
+        source: record.get('sourceId'),
+        target: record.get('targetId'),
+        type: record.get('type'),
+        sourceName: record.get('sourceName'),
+        targetName: record.get('targetName'),
+        ...record.get('relationship').properties
+      }));
+
+      res.json({
+        nodes: components,
+        links: relationships,
+        statistics: {
+          designDocCount: components.length,
+          connectionCount: relationships.length,
+          featureCount: components.filter(n => n.componentType === 'FEATURE').length,
+          specificationCount: components.filter(n => n.componentType === 'SPECIFICATION').length,
+          requirementCount: components.filter(n => n.componentType === 'REQUIREMENT').length,
+          userStoryCount: components.filter(n => n.componentType === 'USER_STORY').length,
+          acceptanceCriteriaCount: components.filter(n => n.componentType === 'ACCEPTANCE_CRITERIA').length
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching design docs:', error);
+      res.status(500).json({ error: error.message });
+    } finally {
+      await session.close();
+    }
+  }
+
+  async getDesignDocsByCodebase(req, res) {
+    const { codebase } = req.params;
+    const session = this.driver.session();
+    
+    try {
+      // Get design document components for specific codebase
+      const componentsResult = await session.run(`
+        MATCH (c:Component {codebase: $codebase})
+        WHERE c.type IN ['SPECIFICATION', 'REQUIREMENT', 'FEATURE', 'USER_STORY', 'ACCEPTANCE_CRITERIA']
+        RETURN c
+        ORDER BY c.name
+      `, { codebase });
+
+      // Get relationships between design document components in this codebase
+      const relationshipsResult = await session.run(`
+        MATCH (source:Component {codebase: $codebase})-[r]->(target:Component {codebase: $codebase})
+        WHERE source.type IN ['SPECIFICATION', 'REQUIREMENT', 'FEATURE', 'USER_STORY', 'ACCEPTANCE_CRITERIA']
+          AND target.type IN ['SPECIFICATION', 'REQUIREMENT', 'FEATURE', 'USER_STORY', 'ACCEPTANCE_CRITERIA']
+          AND type(r) <> 'RELATES_TO'
+        RETURN source.id as sourceId, target.id as targetId, 
+               type(r) as type, r as relationship,
+               source.name as sourceName, target.name as targetName
+      `, { codebase });
+
+      const components = componentsResult.records.map((record, index) => {
+        const props = record.get('c').properties;
+        return {
+          ...props,
+          type: 'component',
+          componentType: props.type,
+          // Auto-generate grid positions if not set
+          position: props.position || this.generateGridPosition(index, 3, 350, 250)
+        };
+      });
+
+      const relationships = relationshipsResult.records.map(record => ({
+        source: record.get('sourceId'),
+        target: record.get('targetId'),
+        type: record.get('type'),
+        sourceName: record.get('sourceName'),
+        targetName: record.get('targetName'),
+        ...record.get('relationship').properties
+      }));
+
+      res.json({
+        nodes: components,
+        links: relationships,
+        codebase,
+        statistics: {
+          designDocCount: components.length,
+          connectionCount: relationships.length,
+          featureCount: components.filter(n => n.componentType === 'FEATURE').length,
+          specificationCount: components.filter(n => n.componentType === 'SPECIFICATION').length,
+          requirementCount: components.filter(n => n.componentType === 'REQUIREMENT').length,
+          userStoryCount: components.filter(n => n.componentType === 'USER_STORY').length,
+          acceptanceCriteriaCount: components.filter(n => n.componentType === 'ACCEPTANCE_CRITERIA').length
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching design docs for codebase:', error);
+      res.status(500).json({ error: error.message });
+    } finally {
+      await session.close();
+    }
+  }
+
+  // Helper method to generate grid positions
+  generateGridPosition(index, cols, nodeWidth, nodeHeight) {
+    const padding = 50;
+    const col = index % cols;
+    const row = Math.floor(index / cols);
+    return {
+      x: padding + col * (nodeWidth + padding),
+      y: padding + row * (nodeHeight + padding)
+    };
   }
 
   // ============================================================================

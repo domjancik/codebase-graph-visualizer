@@ -110,12 +110,12 @@ class DesignDocsVisualization {
             this.showLoading(true);
             
             // For now, use mock data - replace with API call
-            await new Promise(resolve => setTimeout(resolve, 500));
+            const response = await fetch('/api/design-docs');
+            const { nodes, links } = await response.json();
             
-            this.data.nodes = this.createMockNodes();
-            this.data.links = this.createMockLinks();
-            
-            this.filteredData = JSON.parse(JSON.stringify(this.data));
+            this.data.nodes = nodes;
+            this.data.links = links;
+            this.filteredData = { nodes, links };
             
             this.renderVisualization();
             this.updateStatistics();
