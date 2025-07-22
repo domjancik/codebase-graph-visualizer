@@ -47,6 +47,26 @@ body {
     background: rgba(255,255,255,0.3);
 }
 
+/* Navigation links */
+.controls .nav-link {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-block;
+    font-weight: 500;
+}
+
+.controls .nav-link:hover {
+    background: rgba(255,255,255,0.3);
+    text-decoration: none;
+}
+
 .controls select option {
     color: #333;
     background: white;
