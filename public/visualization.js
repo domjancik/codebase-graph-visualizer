@@ -68,7 +68,8 @@ class GraphVisualizer {
     this.filters = {
       componentTypes: new Set(),
       relationshipTypes: new Set(),
-      taskStatuses: new Set()
+      taskStatuses: new Set(),
+      selectedCodebases: new Set()
     };
     
     this.initializeEventListeners();
@@ -137,10 +138,8 @@ class GraphVisualizer {
     document.getElementById('centerBtn').addEventListener('click', () => this.centerGraph());
     document.getElementById('exportBtn').addEventListener('click', () => this.exportData());
     
-    // Codebase selector
-    document.getElementById('codebaseSelect').addEventListener('change', (e) => {
-      this.loadData(e.target.value);
-    });
+    // Multi-select codebase functionality
+    this.setupMultiSelectCodebase();
     
     // Layout controls
     document.getElementById('forceStrength').addEventListener('input', (e) => {
@@ -280,16 +279,14 @@ class GraphVisualizer {
     });
   }
   
-  async loadData(codebase = '') {
+  async loadData() {
     try {
-      const url = codebase ? `/api/graph/${codebase}` : '/api/graph';
-      const response = await fetch(url);
+      // Always fetch all data for client-side filtering
+      const response = await fetch('/api/graph');
       this.data = await response.json();
       
       // Load available codebases for selector
-      if (!codebase) {
-        this.loadCodebases();
-      }
+      this.loadCodebases();
       
       this.updateFilters();
       this.applyFilters();
@@ -307,16 +304,99 @@ class GraphVisualizer {
       const components = await response.json();
       const codebases = [...new Set(components.map(c => c.codebase).filter(Boolean))];
       
-      const select = document.getElementById('codebaseSelect');
-      select.innerHTML = '<option value="">All Codebases</option>';
-      codebases.forEach(codebase => {
-        const option = document.createElement('option');
-        option.value = codebase;
-        option.textContent = codebase;
-        select.appendChild(option);
-      });
+      this.populateCodebaseMultiSelect(codebases.sort());
     } catch (error) {
       console.error('Error loading codebases:', error);
+    }
+  }
+
+  populateCodebaseMultiSelect(codebases) {
+    const container = document.getElementById('codebaseOptions');
+    if (!container) return;
+    
+    // Keep the "All Codebases" option, add individual codebase options
+    codebases.forEach(codebase => {
+      const label = document.createElement('label');
+      label.className = 'checkbox-item';
+      
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = codebase;
+      checkbox.addEventListener('change', () => this.handleCodebaseSelection());
+      
+      const span = document.createElement('span');
+      span.textContent = codebase;
+      
+      label.appendChild(checkbox);
+      label.appendChild(span);
+      container.appendChild(label);
+    });
+  }
+
+  setupMultiSelectCodebase() {
+    const btn = document.getElementById('codebaseSelectBtn');
+    const dropdown = document.getElementById('codebaseSelectDropdown');
+    const allOption = document.getElementById('allCodebasesOption');
+    
+    if (!btn || !dropdown || !allOption) return;
+    
+    // Toggle dropdown
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!btn.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.style.display = 'none';
+      }
+    });
+    
+    // Handle "All Codebases" option
+    allOption.addEventListener('change', () => {
+      if (allOption.checked) {
+        // Uncheck all other options
+        const otherOptions = dropdown.querySelectorAll('input[type="checkbox"]:not(#allCodebasesOption)');
+        otherOptions.forEach(option => option.checked = false);
+        this.filters.selectedCodebases.clear();
+      }
+      this.updateCodebaseButtonText();
+      this.applyFilters();
+      this.updateGraph();
+    });
+  }
+  
+  handleCodebaseSelection() {
+    const allOption = document.getElementById('allCodebasesOption');
+    const otherOptions = document.querySelectorAll('#codebaseOptions input[type="checkbox"]:not(#allCodebasesOption)');
+    const selectedOptions = [...otherOptions].filter(option => option.checked);
+    
+    if (selectedOptions.length > 0) {
+      // If any specific codebase is selected, uncheck "All Codebases"
+      if (allOption) allOption.checked = false;
+      this.filters.selectedCodebases = new Set(selectedOptions.map(option => option.value));
+    } else {
+      // If no specific codebase is selected, check "All Codebases"
+      if (allOption) allOption.checked = true;
+      this.filters.selectedCodebases.clear();
+    }
+    
+    this.updateCodebaseButtonText();
+    this.applyFilters();
+    this.updateGraph();
+  }
+  
+  updateCodebaseButtonText() {
+    const textSpan = document.getElementById('codebaseSelectText');
+    if (!textSpan) return;
+    
+    if (this.filters.selectedCodebases.size === 0) {
+      textSpan.textContent = 'All Codebases';
+    } else if (this.filters.selectedCodebases.size === 1) {
+      textSpan.textContent = [...this.filters.selectedCodebases][0];
+    } else {
+      textSpan.textContent = `${this.filters.selectedCodebases.size} Codebases`;
     }
   }
   
@@ -381,6 +461,11 @@ class GraphVisualizer {
   
   applyFilters() {
     this.filteredData.nodes = this.data.nodes.filter(node => {
+      // Filter by selected codebases
+      if (this.filters.selectedCodebases.size > 0 && node.codebase && !this.filters.selectedCodebases.has(node.codebase)) {
+        return false;
+      }
+      
       if (node.type === 'component') {
         const componentType = node.componentType || node.type;
         return !this.filters.componentTypes.has(componentType);
