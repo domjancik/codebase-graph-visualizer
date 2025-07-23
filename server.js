@@ -722,7 +722,7 @@ class GraphVisualizerServer {
       y: row * (nodeHeight + padding)
     };
   }
-}
+
   async getTaskConnectedGraph(req, res) {
     const { id } = req.params;
     const session = this.driver.session();

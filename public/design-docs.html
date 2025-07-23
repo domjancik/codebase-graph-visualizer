@@ -16,9 +16,20 @@
     <div class="header">
         <h1>📋 Design Documents View</h1>
         <div class="controls">
-            <select id="codebaseSelect">
-                <option value="">All Codebases</option>
-            </select>
+            <div id="codebaseSelectContainer">
+                <button id="codebaseSelectBtn" class="multi-select-btn">
+                    <span id="codebaseSelectText">All Codebases</span>
+                    <span class="dropdown-arrow">▼</span>
+                </button>
+                <div id="codebaseSelectDropdown" class="multi-select-dropdown" style="display: none;">
+                    <div class="multi-select-options" id="codebaseOptions">
+                        <label class="checkbox-item">
+                            <input type="checkbox" value="" id="allCodebasesOption" checked>
+                            <span>All Codebases</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
             <button id="refreshBtn">🔄 Refresh</button>
             <button id="centerBtn">🎯 Center</button>
             <button id="exportBtn">💾 Export</button>

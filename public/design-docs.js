@@ -47,7 +47,7 @@ class DesignDocsVisualization {
             minProbability: 0,
             maxProbability: 100,
             timeOrderFilter: 'all', // all, chronological, reverse
-            selectedCodebase: '',
+            selectedCodebases: new Set(), // Changed to Set for multi-select
             selectedProject: '',
             docTypeFilters: new Set(),
             connectionTypeFilters: new Set()
@@ -157,11 +157,8 @@ class DesignDocsVisualization {
             this.renderVisualization();
         });
         
-        // Codebase selector
-        document.getElementById('codebaseSelect')?.addEventListener('change', (e) => {
-            this.filters.selectedCodebase = e.target.value;
-            this.loadData();
-        });
+        // Multi-select codebase functionality
+        this.setupMultiSelectCodebase();
 
         // View mode selection
         document.querySelectorAll('input[name="viewMode"]').forEach(input => {
@@ -187,13 +184,11 @@ class DesignDocsVisualization {
                 const selectedTypes = [...document.querySelectorAll('#componentTypeFilters input:checked')]
                     .map(input => input.value);
                 const typeQuery = selectedTypes.length > 0 ? `?types=${selectedTypes.join(',')}` : '';
-                url = this.filters.selectedCodebase 
-                    ? `/api/design-docs-flexible/${this.filters.selectedCodebase}${typeQuery}`
-                    : `/api/design-docs-flexible${typeQuery}`;
+                // For multi-select codebases, we'll fetch all data and filter client-side
+                url = `/api/design-docs-flexible${typeQuery}`;
             } else {
-                url = this.filters.selectedCodebase 
-                    ? `/api/design-docs/${this.filters.selectedCodebase}` 
-                    : '/api/design-docs';
+                // For multi-select codebases, we'll fetch all data and filter client-side
+                url = '/api/design-docs';
             }
             const response = await fetch(url);
             const { nodes, links } = await response.json();
@@ -222,16 +217,97 @@ class DesignDocsVisualization {
             const components = await response.json();
             const codebases = [...new Set(components.map(c => c.codebase).filter(Boolean))];
             
-            const select = document.getElementById('codebaseSelect');
-            select.innerHTML = '<option value="">All Codebases</option>';
-            codebases.forEach(codebase => {
-                const option = document.createElement('option');
-                option.value = codebase;
-                option.textContent = codebase;
-                select.appendChild(option);
-            });
+            this.populateCodebaseMultiSelect(codebases);
         } catch (error) {
             console.error('Error loading codebase options:', error);
+        }
+    }
+    
+    populateCodebaseMultiSelect(codebases) {
+        const container = document.getElementById('codebaseOptions');
+        if (!container) return;
+        
+        // Keep the "All Codebases" option, add individual codebase options
+        codebases.forEach(codebase => {
+            const label = document.createElement('label');
+            label.className = 'checkbox-item';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = codebase;
+            checkbox.addEventListener('change', () => this.handleCodebaseSelection());
+            
+            const span = document.createElement('span');
+            span.textContent = codebase;
+            
+            label.appendChild(checkbox);
+            label.appendChild(span);
+            container.appendChild(label);
+        });
+    }
+    
+    setupMultiSelectCodebase() {
+        const btn = document.getElementById('codebaseSelectBtn');
+        const dropdown = document.getElementById('codebaseSelectDropdown');
+        const allOption = document.getElementById('allCodebasesOption');
+        
+        if (!btn || !dropdown || !allOption) return;
+        
+        // Toggle dropdown
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!btn.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+        
+        // Handle "All Codebases" option
+        allOption.addEventListener('change', () => {
+            if (allOption.checked) {
+                // Uncheck all other options
+                const otherOptions = dropdown.querySelectorAll('input[type="checkbox"]:not(#allCodebasesOption)');
+                otherOptions.forEach(option => option.checked = false);
+                this.filters.selectedCodebases.clear();
+            }
+            this.updateCodebaseButtonText();
+            this.loadData();
+        });
+    }
+    
+    handleCodebaseSelection() {
+        const allOption = document.getElementById('allCodebasesOption');
+        const otherOptions = document.querySelectorAll('#codebaseOptions input[type="checkbox"]:not(#allCodebasesOption)');
+        const selectedOptions = [...otherOptions].filter(option => option.checked);
+        
+        if (selectedOptions.length > 0) {
+            // If any specific codebase is selected, uncheck "All Codebases"
+            if (allOption) allOption.checked = false;
+            this.filters.selectedCodebases = new Set(selectedOptions.map(option => option.value));
+        } else {
+            // If no specific codebase is selected, check "All Codebases"
+            if (allOption) allOption.checked = true;
+            this.filters.selectedCodebases.clear();
+        }
+        
+        this.updateCodebaseButtonText();
+        this.loadData();
+    }
+    
+    updateCodebaseButtonText() {
+        const textSpan = document.getElementById('codebaseSelectText');
+        if (!textSpan) return;
+        
+        if (this.filters.selectedCodebases.size === 0) {
+            textSpan.textContent = 'All Codebases';
+        } else if (this.filters.selectedCodebases.size === 1) {
+            textSpan.textContent = [...this.filters.selectedCodebases][0];
+        } else {
+            textSpan.textContent = `${this.filters.selectedCodebases.size} Codebases`;
         }
     }
     
@@ -267,7 +343,11 @@ class DesignDocsVisualization {
             checkbox.checked = priorityTypes.includes(type); // Check priority types by default
             
             checkbox.addEventListener('change', () => {
-                this.loadData();
+                // Debounce the loadData call to avoid excessive API calls
+                clearTimeout(this._componentTypeChangeTimeout);
+                this._componentTypeChangeTimeout = setTimeout(() => {
+                    this.loadData();
+                }, 300);
             });
             
             const span = document.createElement('span');
@@ -282,6 +362,13 @@ class DesignDocsVisualization {
     applyFilters() {
         let filteredNodes = [...this.data.nodes];
         let filteredLinks = [...this.data.links];
+        
+        // Filter by selected codebases
+        if (this.filters.selectedCodebases.size > 0) {
+            filteredNodes = filteredNodes.filter(node => 
+                this.filters.selectedCodebases.has(node.codebase)
+            );
+        }
         
         // Filter by document types
         if (this.filters.docTypeFilters.size > 0) {
@@ -314,14 +401,28 @@ class DesignDocsVisualization {
     }
     
     updateFilterOptions() {
-        // Update document type filters
-        const docTypes = new Set();
-        this.data.nodes.forEach(node => {
-            if (node.componentType) {
-                docTypes.add(node.componentType);
+        const viewMode = document.querySelector('input[name="viewMode"]:checked')?.value || 'design';
+        
+        // Clear existing filter sets to avoid stale data
+        this.filters.docTypeFilters.clear();
+        this.filters.connectionTypeFilters.clear();
+        
+        // Update document type filters (only show in design mode)
+        if (viewMode === 'design') {
+            const docTypes = new Set();
+            this.data.nodes.forEach(node => {
+                if (node.componentType) {
+                    docTypes.add(node.componentType);
+                }
+            });
+            this.createFilterCheckboxes('docTypeFilters', docTypes, 'docTypeFilters');
+        } else {
+            // In flexible mode, hide document type filters since component types are selected above
+            const docTypeContainer = document.getElementById('docTypeFilters');
+            if (docTypeContainer) {
+                docTypeContainer.innerHTML = '<p style="font-size: 0.75rem; color: #999; font-style: italic;">Component types are selected above in flexible mode</p>';
             }
-        });
-        this.createFilterCheckboxes('docTypeFilters', docTypes, 'docTypeFilters');
+        }
         
         // Update connection type filters
         const connectionTypes = new Set();
