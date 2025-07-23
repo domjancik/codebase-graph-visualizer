@@ -216,7 +216,11 @@ class ArchitecturalDiagramVisualization {
             .attr('dy', 5)
             .attr('text-anchor', 'middle')
             .attr('font-size', '10px')
-            .attr('fill', '#333')
+            .attr('font-weight', '600')
+            .attr('fill', '#ffffff')
+            .attr('stroke', '#000000')
+            .attr('stroke-width', '0.5px')
+            .attr('paint-order', 'stroke fill')
             .text(node.componentType || 'COMPONENT');
 
         // Add node name below
@@ -225,7 +229,10 @@ class ArchitecturalDiagramVisualization {
             .attr('text-anchor', 'middle')
             .attr('font-size', '12px')
             .attr('font-weight', 'bold')
-            .attr('fill', '#333')
+            .attr('fill', '#ffffff')
+            .attr('stroke', '#000000')
+            .attr('stroke-width', '0.8px')
+            .attr('paint-order', 'stroke fill')
             .text(node.name || 'Unnamed');
 
         // Add hover effects
