@@ -1,4 +1,4 @@
-// Puppeteer script to detect console errors in design-docs view
+// Puppeteer script to detect console errors in architectural view
 import puppeteer from 'puppeteer';
 
 (async () => {
@@ -18,8 +18,8 @@ import puppeteer from 'puppeteer';
     });
 
     try {
-        console.log('Navigating to design-docs.html...');
-        await page.goto('http://localhost:3000/design-docs.html', {
+        console.log('Navigating to architectural-view.html...');
+        await page.goto('http://localhost:3000/architectural-view.html', {
             waitUntil: 'networkidle2',
         });
         console.log('Page loaded successfully');
@@ -27,12 +27,31 @@ import puppeteer from 'puppeteer';
         // Wait a bit for any dynamic content to load
         await new Promise(resolve => setTimeout(resolve, 2000));
         
-        // Check if nodes are rendered
-        const nodeCount = await page.evaluate(() => {
-            return document.querySelectorAll('.doc-node').length;
+        // Check if architectural canvas exists
+        const canvasExists = await page.evaluate(() => {
+            return document.getElementById('architecturalCanvas') !== null;
         });
         
-        console.log(`Found ${nodeCount} design document nodes on the page`);
+        console.log(`Architectural canvas exists: ${canvasExists}`);
+        
+        // Check for SVG elements
+        const svgCount = await page.evaluate(() => {
+            return document.querySelectorAll('svg').length;
+        });
+        
+        console.log(`Found ${svgCount} SVG elements on the page`);
+        
+        // Check for any error messages
+        const errorMessages = await page.evaluate(() => {
+            const errors = [];
+            const consoleElements = document.querySelectorAll('.error, .warning');
+            consoleElements.forEach(el => errors.push(el.textContent));
+            return errors;
+        });
+        
+        if (errorMessages.length > 0) {
+            console.log('Error messages found:', errorMessages);
+        }
         
     } catch (err) {
         console.error(`Navigation failed: ${err.message}`);
