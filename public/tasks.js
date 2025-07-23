@@ -394,6 +394,30 @@ class TaskManager {
     window.location.href = `/?highlight=${task.id}`;
   }
 
+  async viewConnectedGraph(task) {
+    try {
+      const response = await fetch(`/api/tasks/${task.id}/connected-graph`);
+      if (!response.ok) {
+        throw new Error('Failed to load connected graph');
+      }
+      
+      const graphData = await response.json();
+      
+      // Store the graph data in sessionStorage for the main graph to use
+      sessionStorage.setItem('taskConnectedGraph', JSON.stringify({
+        ...graphData,
+        taskId: task.id,
+        taskName: task.name
+      }));
+      
+      // Navigate to main graph view with special parameter
+      window.location.href = `/?mode=task-connected&taskId=${task.id}`;
+    } catch (error) {
+      console.error('Error loading connected graph:', error);
+      this.showError('Failed to load connected graph: ' + error.message);
+    }
+  }
+
   copyTaskId(task) {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(task.id).then(() => {

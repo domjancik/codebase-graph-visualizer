@@ -48,6 +48,7 @@ class GraphVisualizerServer {
     this.app.get('/api/design-docs', this.getDesignDocs.bind(this));
     this.app.get('/api/design-docs/:codebase', this.getDesignDocsByCodebase.bind(this));
     this.app.get('/api/tasks', this.getTasks.bind(this));
+    this.app.get('/api/tasks/:id/connected-graph', this.getTaskConnectedGraph.bind(this));
     this.app.get('/api/overview/:codebase', this.getCodebaseOverview.bind(this));
     this.app.get('/api/dependency-tree/:componentId', this.getDependencyTree.bind(this));
     this.app.get('/api/node-types', this.getNodeTypes.bind(this));
@@ -568,6 +569,130 @@ class GraphVisualizerServer {
       x: col * (nodeWidth + padding), // No additional offset needed - CSS handles canvas padding
       y: row * (nodeHeight + padding)
     };
+  }
+
+  async getTaskConnectedGraph(req, res) {
+    const { id } = req.params;
+    const session = this.driver.session();
+    
+    try {
+      // Get the task itself
+      const taskResult = await session.run(`
+        MATCH (t:Task {id: $id})
+        RETURN t
+      `, { id });
+      
+      if (taskResult.records.length === 0) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+      
+      const task = {
+        ...taskResult.records[0].get('t').properties,
+        type: 'task'
+      };
+      
+      // Get all components directly related to the task
+      const directComponentsResult = await session.run(`
+        MATCH (t:Task {id: $id})-[:RELATES_TO]->(c:Component)
+        RETURN c
+      `, { id });
+      
+      const directComponents = directComponentsResult.records.map(record => {
+        const props = record.get('c').properties;
+        return {
+          ...props,
+          type: 'component',
+          componentType: props.type
+        };
+      });
+      
+      // Get all components that have relationships with the direct components (1 level deep)
+      const connectedComponentIds = directComponents.map(c => c.id);
+      let connectedComponents = [];
+      let allRelationships = [];
+      
+      if (connectedComponentIds.length > 0) {
+        const connectedResult = await session.run(`
+          MATCH (c1:Component)-[r]-(c2:Component)
+          WHERE c1.id IN $componentIds OR c2.id IN $componentIds
+          RETURN DISTINCT c1, c2, r, type(r) as relType
+        `, { componentIds: connectedComponentIds });
+        
+        const componentMap = new Map();
+        
+        // Add direct components to map
+        directComponents.forEach(c => componentMap.set(c.id, c));
+        
+        // Process all connected relationships
+        connectedResult.records.forEach(record => {
+          const c1Props = record.get('c1').properties;
+          const c2Props = record.get('c2').properties;
+          const relationship = record.get('r').properties;
+          const relType = record.get('relType');
+          
+          // Add components to map if not already present
+          if (!componentMap.has(c1Props.id)) {
+            componentMap.set(c1Props.id, {
+              ...c1Props,
+              type: 'component',
+              componentType: c1Props.type
+            });
+          }
+          
+          if (!componentMap.has(c2Props.id)) {
+            componentMap.set(c2Props.id, {
+              ...c2Props,
+              type: 'component',
+              componentType: c2Props.type
+            });
+          }
+          
+          // Add relationship
+          allRelationships.push({
+            source: c1Props.id,
+            target: c2Props.id,
+            type: relType,
+            sourceName: c1Props.name,
+            targetName: c2Props.name,
+            ...relationship
+          });
+        });
+        
+        connectedComponents = Array.from(componentMap.values());
+      }
+      
+      // Get other tasks that are related to the same components (sibling tasks)
+      const siblingTasksResult = await session.run(`
+        MATCH (t:Task)-[:RELATES_TO]->(c:Component)
+        WHERE c.id IN $componentIds AND t.id <> $taskId
+        RETURN DISTINCT t
+      `, { componentIds: connectedComponentIds, taskId: id });
+      
+      const siblingTasks = siblingTasksResult.records.map(record => ({
+        ...record.get('t').properties,
+        type: 'task'
+      }));
+      
+      // Combine all nodes
+      const allNodes = [task, ...connectedComponents, ...siblingTasks];
+      
+      res.json({
+        nodes: allNodes,
+        links: allRelationships,
+        focusTask: task,
+        statistics: {
+          taskCount: siblingTasks.length + 1,
+          componentCount: connectedComponents.length,
+          relationshipCount: allRelationships.length,
+          directComponentCount: directComponents.length
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching task connected graph:', error);
+      res.status(500).json({ error: error.message });
+    } finally {
+      await session.close();
+    }
   }
 
   // ============================================================================
