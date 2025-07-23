@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Architectural Diagram View - Codebase Graph</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="architectural-view.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="header">
+        <h1>🏗️ Architectural Diagram View</h1>
+        <div class="controls">
+            <select id="codebaseSelect">
+                <option value="">All Codebases</option>
+            </select>
+            <button id="refreshBtn">🔄 Refresh</button>
+            <button id="centerBtn">🎯 Center</button>
+            <button id="exportBtn">💾 Export</button>
+            <a href="index.html" class="nav-link">🔍 Graph View</a>
+            <a href="design-docs.html" class="nav-link">📋 Design Docs</a>
+            <a href="tasks.html" class="nav-link">📝 Tasks</a>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar" id="sidebar">
+            <div class="panel">
+                <h3>📊 Statistics</h3>
+                <div id="statistics">
+                    <div class="stat-item">
+                        <span class="stat-label">Components:</span>
+                        <span class="stat-value" id="componentCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Systems:</span>
+                        <span class="stat-value" id="systemCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Layers:</span>
+                        <span class="stat-value" id="layerCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Connections:</span>
+                        <span class="stat-value" id="connectionCount">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>🔧 Filters</h3>
+                <div id="filters">
+                    <div class="filter-group">
+                        <label>Component Types:</label>
+                        <div id="componentTypeFilters" class="checkbox-group"></div>
+                    </div>
+                    <div class="filter-group">
+                        <label>Relationship Types:</label>
+                        <div id="relationshipTypeFilters" class="checkbox-group"></div>
+                    </div>
+                    <div class="filter-group">
+                        <label>Architectural Layers:</label>
+                        <div id="layerFilters" class="checkbox-group"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>🎨 Layout</h3>
+                <div class="layout-controls">
+                    <label>Layout Type:</label>
+                    <select id="layoutType">
+                        <option value="hierarchical">Hierarchical</option>
+                        <option value="layered">Layered Architecture</option>
+                        <option value="modular">Modular Blocks</option>
+                        <option value="circular">Circular Dependencies</option>
+                    </select>
+                    
+                    <label>Layer Spacing:</label>
+                    <input type="range" id="layerSpacing" min="100" max="400" value="200">
+                    
+                    <label>Node Spacing:</label>
+                    <input type="range" id="nodeSpacing" min="50" max="200" value="100">
+                    
+                    <label>Show Grid:</label>
+                    <input type="checkbox" id="showGrid" checked>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>ℹ️ Selection Info</h3>
+                <div id="selectionInfo">
+                    <p>Click on a component to see details</p>
+                </div>
+            </div>
+            <div class="sidebar-resize-handle" id="sidebarResizeHandle"></div>
+        </div>
+
+        <div class="visualization-container">
+            <div id="architecturalCanvas"></div>
+            <div class="arch-legend">
+                <h4>Legend</h4>
+                <div class="legend-section">
+                    <h5>Component Types</h5>
+                    <div class="legend-items" id="componentLegend"></div>
+                </div>
+                <div class="legend-section">
+                    <h5>Relationship Types</h5>
+                    <div class="legend-items" id="relationshipLegend"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tooltip" class="tooltip"></div>
+
+    <script src="architectural-view.js"></script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+/* Styles for Architectural Diagram View */
+
+#architecturalCanvas {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: auto;
+    background:
+        linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px),
+        linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
+        #fafafa;
+    background-size: 40px 40px;
+}
+
+.arch-legend {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(255,255,255,0.95);
+    border: 1px solid #e1e1e1;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    max-width: 250px;
+    backdrop-filter: blur(10px);
+}
+
+/* Node styles */
+.node {
+    stroke: #ddd;
+    stroke-width: 2px;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+.node:hover {
+    stroke-width: 3px;
+    filter: brightness(1.1);
+    border-color: #667eea;
+}
+
+.selected {
+    stroke: #ff6b6b;
+    stroke-width: 3px;
+    box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.2);
+}
+
+.connection {
+    stroke: #999;
+    stroke-width: 2px;
+    stroke-dasharray: 5,2;
+}
+
+.connection:hover {
+    stroke: #667eea;
+    stroke-width: 3px;
+}
+
