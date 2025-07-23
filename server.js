@@ -47,6 +47,8 @@ class GraphVisualizerServer {
     this.app.get('/api/components/:id/relationships', this.getComponentRelationships.bind(this));
     this.app.get('/api/design-docs', this.getDesignDocs.bind(this));
     this.app.get('/api/design-docs/:codebase', this.getDesignDocsByCodebase.bind(this));
+    this.app.get('/api/design-docs-flexible', this.getDesignDocsFlexible.bind(this));
+    this.app.get('/api/design-docs-flexible/:codebase', this.getDesignDocsFlexibleByCodebase.bind(this));
     this.app.get('/api/tasks', this.getTasks.bind(this));
     this.app.get('/api/tasks/:id/connected-graph', this.getTaskConnectedGraph.bind(this));
     this.app.get('/api/overview/:codebase', this.getCodebaseOverview.bind(this));
@@ -559,6 +561,156 @@ class GraphVisualizerServer {
     }
   }
 
+  async getDesignDocsFlexible(req, res) {
+    const session = this.driver.session();
+    const { types } = req.query; // Expected as comma-separated string
+    
+    try {
+      // Default to design document types if no types specified
+      const componentTypes = types 
+        ? types.split(',').map(t => t.trim())
+        : ['SPECIFICATION', 'REQUIREMENT', 'FEATURE', 'USER_STORY', 'ACCEPTANCE_CRITERIA'];
+      
+      // Get components of specified types
+      const componentsResult = await session.run(`
+        MATCH (c:Component)
+        WHERE c.type IN $componentTypes
+        RETURN c
+        ORDER BY c.codebase, c.type, c.name
+      `, { componentTypes });
+
+      // Get all relationships between components of specified types
+      const relationshipsResult = await session.run(`
+        MATCH (source:Component)-[r]->(target:Component)
+        WHERE source.type IN $componentTypes
+          AND target.type IN $componentTypes
+          AND type(r) <> 'RELATES_TO'
+        RETURN source.id as sourceId, target.id as targetId, 
+               type(r) as type, r as relationship,
+               source.name as sourceName, target.name as targetName
+      `, { componentTypes });
+
+      const components = componentsResult.records.map((record, index) => {
+        const props = record.get('c').properties;
+        return {
+          ...props,
+          type: 'component',
+          componentType: props.type,
+          // Auto-generate grid positions if not set
+          position: props.position || this.generateGridPosition(index, 4, 320, 220)
+        };
+      });
+
+      const relationships = relationshipsResult.records.map(record => ({
+        source: record.get('sourceId'),
+        target: record.get('targetId'),
+        type: record.get('type'),
+        sourceName: record.get('sourceName'),
+        targetName: record.get('targetName'),
+        ...record.get('relationship').properties
+      }));
+
+      // Calculate statistics for each component type
+      const statistics = {
+        totalCount: components.length,
+        connectionCount: relationships.length,
+        typeBreakdown: {}
+      };
+      
+      componentTypes.forEach(type => {
+        statistics.typeBreakdown[type] = components.filter(n => n.componentType === type).length;
+      });
+
+      res.json({
+        nodes: components,
+        links: relationships,
+        availableTypes: componentTypes,
+        statistics
+      });
+    } catch (error) {
+      console.error('Error fetching flexible design docs:', error);
+      res.status(500).json({ error: error.message });
+    } finally {
+      await session.close();
+    }
+  }
+
+  async getDesignDocsFlexibleByCodebase(req, res) {
+    const { codebase } = req.params;
+    const { types } = req.query; // Expected as comma-separated string
+    const session = this.driver.session();
+    
+    try {
+      // Default to design document types if no types specified
+      const componentTypes = types 
+        ? types.split(',').map(t => t.trim())
+        : ['SPECIFICATION', 'REQUIREMENT', 'FEATURE', 'USER_STORY', 'ACCEPTANCE_CRITERIA'];
+      
+      // Get components of specified types for specific codebase
+      const componentsResult = await session.run(`
+        MATCH (c:Component {codebase: $codebase})
+        WHERE c.type IN $componentTypes
+        RETURN c
+        ORDER BY c.type, c.name
+      `, { codebase, componentTypes });
+
+      // Get relationships between components of specified types in this codebase
+      const relationshipsResult = await session.run(`
+        MATCH (source:Component {codebase: $codebase})-[r]->(target:Component {codebase: $codebase})
+        WHERE source.type IN $componentTypes
+          AND target.type IN $componentTypes
+          AND type(r) <> 'RELATES_TO'
+        RETURN source.id as sourceId, target.id as targetId, 
+               type(r) as type, r as relationship,
+               source.name as sourceName, target.name as targetName
+      `, { codebase, componentTypes });
+
+      const components = componentsResult.records.map((record, index) => {
+        const props = record.get('c').properties;
+        return {
+          ...props,
+          type: 'component',
+          componentType: props.type,
+          // Auto-generate grid positions if not set
+          position: props.position || this.generateGridPosition(index, 4, 320, 220)
+        };
+      });
+
+      const relationships = relationshipsResult.records.map(record => ({
+        source: record.get('sourceId'),
+        target: record.get('targetId'),
+        type: record.get('type'),
+        sourceName: record.get('sourceName'),
+        targetName: record.get('targetName'),
+        ...record.get('relationship').properties
+      }));
+
+      // Calculate statistics for each component type
+      const statistics = {
+        totalCount: components.length,
+        connectionCount: relationships.length,
+        typeBreakdown: {}
+      };
+      
+      componentTypes.forEach(type => {
+        statistics.typeBreakdown[type] = components.filter(n => n.componentType === type).length;
+      });
+
+      res.json({
+        nodes: components,
+        links: relationships,
+        codebase,
+        availableTypes: componentTypes,
+        statistics
+      });
+    } catch (error) {
+      console.error('Error fetching flexible design docs for codebase:', error);
+      res.status(500).json({ error: error.message });
+    } finally {
+      await session.close();
+    }
+  }
+
   // Helper method to generate grid positions
   generateGridPosition(index, cols, nodeWidth, nodeHeight) {
     const padding = 50; // Space between nodes
@@ -570,7 +722,7 @@ class GraphVisualizerServer {
       y: row * (nodeHeight + padding)
     };
   }
-
+}
   async getTaskConnectedGraph(req, res) {
     const { id } = req.params;
     const session = this.driver.session();

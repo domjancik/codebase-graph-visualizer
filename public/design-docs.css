@@ -451,3 +451,80 @@
     color: #666;
     line-height: 1.4;
 }
+
+/* View mode selector styles */
+.view-mode-selector {
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.radio-item {
+    display: block;
+    margin: 0.25rem 0;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.radio-item input[type="radio"] {
+    margin-right: 0.5rem;
+}
+
+.radio-item span {
+    color: #555;
+}
+
+.radio-item:hover span {
+    color: #333;
+}
+
+.checkbox-item {
+    display: block;
+    margin: 0.25rem 0;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.checkbox-item input[type="checkbox"] {
+    margin-right: 0.5rem;
+}
+
+.checkbox-item span {
+    color: #555;
+}
+
+.checkbox-item:hover span {
+    color: #333;
+}
+
+/* Enhanced component type styles */
+.doc-type-file .doc-node-type {
+    background: #e1f5fe;
+    color: #0277bd;
+}
+
+.doc-type-class .doc-node-type {
+    background: #f3e5f5;
+    color: #7b1fa2;
+}
+
+.doc-type-function .doc-node-type {
+    background: #e8f5e8;
+    color: #2e7d32;
+}
+
+.doc-type-module .doc-node-type {
+    background: #fff3e0;
+    color: #ef6c00;
+}
+
+.doc-type-system .doc-node-type {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.doc-type-interface .doc-node-type {
+    background: #e0f2f1;
+    color: #00695c;
+}

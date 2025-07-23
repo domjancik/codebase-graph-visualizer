@@ -162,6 +162,18 @@ class DesignDocsVisualization {
             this.filters.selectedCodebase = e.target.value;
             this.loadData();
         });
+
+        // View mode selection
+        document.querySelectorAll('input[name="viewMode"]').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const flexibleMode = e.target.value === 'flexible';
+                document.getElementById('componentTypeSelector').style.display = flexibleMode ? 'block' : 'none';
+                if (flexibleMode) {
+                    this.loadComponentTypes();
+                }
+                this.loadData();
+            });
+        });
     }
     
     async loadData() {
@@ -169,10 +181,20 @@ class DesignDocsVisualization {
             // Show loading
             this.showLoading(true);
             
-            // Use codebase-specific endpoint if a codebase is selected
-            const url = this.filters.selectedCodebase 
-                ? `/api/design-docs/${this.filters.selectedCodebase}` 
-                : '/api/design-docs';
+            const viewMode = document.querySelector('input[name="viewMode"]:checked').value;
+            let url;
+            if (viewMode === 'flexible') {
+                const selectedTypes = [...document.querySelectorAll('#componentTypeFilters input:checked')]
+                    .map(input => input.value);
+                const typeQuery = selectedTypes.length > 0 ? `?types=${selectedTypes.join(',')}` : '';
+                url = this.filters.selectedCodebase 
+                    ? `/api/design-docs-flexible/${this.filters.selectedCodebase}${typeQuery}`
+                    : `/api/design-docs-flexible${typeQuery}`;
+            } else {
+                url = this.filters.selectedCodebase 
+                    ? `/api/design-docs/${this.filters.selectedCodebase}` 
+                    : '/api/design-docs';
+            }
             const response = await fetch(url);
             const { nodes, links } = await response.json();
             
@@ -211,6 +233,50 @@ class DesignDocsVisualization {
         } catch (error) {
             console.error('Error loading codebase options:', error);
         }
+    }
+    
+    async loadComponentTypes() {
+        try {
+            const response = await fetch('/api/node-types');
+            const { types } = await response.json();
+            const allTypes = types.flat();
+            
+            this.createComponentTypeCheckboxes(allTypes);
+        } catch (error) {
+            console.error('Error loading component types:', error);
+        }
+    }
+    
+    createComponentTypeCheckboxes(types) {
+        const container = document.getElementById('componentTypeFilters');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        // Common component types that are likely to have interesting relationships
+        const priorityTypes = ['FILE', 'CLASS', 'FUNCTION', 'MODULE', 'SYSTEM', 'INTERFACE'];
+        const sortedTypes = [...new Set([...priorityTypes, ...types])].filter(type => type);
+        
+        sortedTypes.forEach(type => {
+            const label = document.createElement('label');
+            label.className = 'checkbox-item';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = type;
+            checkbox.checked = priorityTypes.includes(type); // Check priority types by default
+            
+            checkbox.addEventListener('change', () => {
+                this.loadData();
+            });
+            
+            const span = document.createElement('span');
+            span.textContent = type.replace('_', ' ');
+            
+            label.appendChild(checkbox);
+            label.appendChild(span);
+            container.appendChild(label);
+        });
     }
     
     applyFilters() {

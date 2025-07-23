@@ -51,6 +51,23 @@
                 <h3>🔧 Filters</h3>
                 <div id="filters">
                     <div class="filter-group">
+                        <label>View Mode:</label>
+                        <div class="view-mode-selector">
+                            <label class="radio-item">
+                                <input type="radio" name="viewMode" value="design" checked>
+                                <span>Design Documents Only</span>
+                            </label>
+                            <label class="radio-item">
+                                <input type="radio" name="viewMode" value="flexible">
+                                <span>Custom Component Types</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="filter-group" id="componentTypeSelector" style="display: none;">
+                        <label>Component Types:</label>
+                        <div id="componentTypeFilters" class="checkbox-group"></div>
+                    </div>
+                    <div class="filter-group">
                         <label>Document Types:</label>
                         <div id="docTypeFilters" class="checkbox-group"></div>
                     </div>
