@@ -140,10 +140,16 @@ class TaskManager {
   }
 
   populateProjectFilter() {
-    // Extract unique projects from related components
+    // Extract unique projects from tasks and components
     const projects = new Set();
     
+    // Get projects directly from tasks (if they have codebase property)
     this.tasks.forEach(task => {
+      if (task.codebase) {
+        projects.add(task.codebase);
+      }
+      
+      // Also check related components
       if (task.relatedComponentIds && task.relatedComponentIds.length > 0) {
         task.relatedComponentIds.forEach(componentId => {
           const component = this.components.find(c => c.id === componentId);
@@ -161,8 +167,13 @@ class TaskManager {
       }
     });
 
+    console.log('Available projects:', Array.from(projects)); // Debug log
+
     const projectFilter = document.getElementById('projectFilter');
     if (projectFilter) {
+      // Store current selection
+      const currentSelection = projectFilter.value;
+      
       // Clear existing options except "All Projects"
       projectFilter.innerHTML = '<option value="">All Projects</option>';
       
@@ -173,36 +184,56 @@ class TaskManager {
         option.textContent = project;
         projectFilter.appendChild(option);
       });
+      
+      // Restore selection if it still exists
+      if (currentSelection && projects.has(currentSelection)) {
+        projectFilter.value = currentSelection;
+      }
     }
   }
 
   renderTasks() {
     let filteredTasks = this.tasks;
     
+    console.log('Rendering tasks with filters:', this.filters);
+    console.log('Total tasks before filtering:', filteredTasks.length);
+    
     // Apply status filter
     if (this.filters.status) {
       filteredTasks = filteredTasks.filter(task => task.status === this.filters.status);
+      console.log('Tasks after status filter:', filteredTasks.length);
     }
     
     // Apply project filter
     if (this.filters.project) {
+      console.log('Applying project filter for:', this.filters.project);
+      
       filteredTasks = filteredTasks.filter(task => {
         // First check if task has a direct codebase property
         if (task.codebase === this.filters.project) {
+          console.log('Task matches by direct codebase:', task.name, task.codebase);
           return true;
         }
         
         // Then check related components
         if (task.relatedComponentIds && task.relatedComponentIds.length > 0) {
-          return task.relatedComponentIds.some(componentId => {
+          const matches = task.relatedComponentIds.some(componentId => {
             const component = this.components.find(c => c.id === componentId);
-            return component && component.codebase === this.filters.project;
+            if (component && component.codebase === this.filters.project) {
+              console.log('Task matches by related component:', task.name, 'via', component.name, component.codebase);
+              return true;
+            }
+            return false;
           });
+          if (matches) return true;
         }
         
         // If task has no codebase and no related components, exclude it
+        console.log('Task excluded:', task.name, 'codebase:', task.codebase, 'relatedComponents:', task.relatedComponentIds?.length || 0);
         return false;
       });
+      
+      console.log('Tasks after project filter:', filteredTasks.length);
     }
 
     // Clear all columns
