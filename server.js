@@ -436,7 +436,7 @@ class GraphVisualizerServer {
       // Get design document components (SPECIFICATION, REQUIREMENT, FEATURE, USER_STORY, ACCEPTANCE_CRITERIA)
       const componentsResult = await session.run(`
         MATCH (c:Component)
-        WHERE c.type IN ['SPECIFICATION', 'REQUIREMENT', 'FEATURE', 'USER_STORY', 'ACCEPTANCE_CRITERIA']
+        WHERE c.type IN ['SPECIFICATION', 'REQUIREMENT', 'FEATURE', 'USER_STORY', 'ACCEPTANCE_CRITERIA', 'SYSTEM', 'MODULE', 'CLASS']
         RETURN c
         ORDER BY c.codebase, c.name
       `);
@@ -444,8 +444,8 @@ class GraphVisualizerServer {
       // Get all relationships between design document components
       const relationshipsResult = await session.run(`
         MATCH (source:Component)-[r]->(target:Component)
-        WHERE source.type IN ['SPECIFICATION', 'REQUIREMENT', 'FEATURE', 'USER_STORY', 'ACCEPTANCE_CRITERIA']
-          AND target.type IN ['SPECIFICATION', 'REQUIREMENT', 'FEATURE', 'USER_STORY', 'ACCEPTANCE_CRITERIA']
+        WHERE source.type IN ['SPECIFICATION', 'REQUIREMENT', 'FEATURE', 'USER_STORY', 'ACCEPTANCE_CRITERIA', 'SYSTEM', 'MODULE', 'CLASS']
+          AND target.type IN ['SPECIFICATION', 'REQUIREMENT', 'FEATURE', 'USER_STORY', 'ACCEPTANCE_CRITERIA', 'SYSTEM', 'MODULE', 'CLASS']
           AND type(r) <> 'RELATES_TO'
         RETURN source.id as sourceId, target.id as targetId, 
                type(r) as type, r as relationship,
