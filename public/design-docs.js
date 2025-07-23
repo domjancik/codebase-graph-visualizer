@@ -46,12 +46,18 @@ class DesignDocsVisualization {
             showProbabilityLabels: true,
             minProbability: 0,
             maxProbability: 100,
-            timeOrderFilter: 'all' // all, chronological, reverse
+            timeOrderFilter: 'all', // all, chronological, reverse
+            selectedCodebase: '',
+            selectedProject: '',
+            docTypeFilters: new Set(),
+            connectionTypeFilters: new Set()
         };
         
         this.initializeVisualization();
         this.setupEventListeners();
-        this.loadData();
+        this.loadCodebaseOptions().then(() => {
+            this.loadData();
+        });
     }
     
     initializeVisualization() {
@@ -150,6 +156,12 @@ class DesignDocsVisualization {
             this.applyTimeOrderFilter();
             this.renderVisualization();
         });
+        
+        // Codebase selector
+        document.getElementById('codebaseSelect')?.addEventListener('change', (e) => {
+            this.filters.selectedCodebase = e.target.value;
+            this.loadData();
+        });
     }
     
     async loadData() {
@@ -157,23 +169,190 @@ class DesignDocsVisualization {
             // Show loading
             this.showLoading(true);
             
-            // For now, use mock data - replace with API call
-            const response = await fetch('/api/design-docs');
+            // Use codebase-specific endpoint if a codebase is selected
+            const url = this.filters.selectedCodebase 
+                ? `/api/design-docs/${this.filters.selectedCodebase}` 
+                : '/api/design-docs';
+            const response = await fetch(url);
             const { nodes, links } = await response.json();
             
             this.data.nodes = nodes;
             this.data.links = links;
-            this.filteredData = { nodes, links };
+            
+            // Apply filters
+            this.applyFilters();
             
             this.renderVisualization();
             this.updateStatistics();
             this.updateLegend();
+            this.updateFilterOptions();
             
         } catch (error) {
             console.error('Error loading design docs:', error);
         } finally {
             this.showLoading(false);
         }
+    }
+    
+    async loadCodebaseOptions() {
+        try {
+            const response = await fetch('/api/components');
+            const components = await response.json();
+            const codebases = [...new Set(components.map(c => c.codebase).filter(Boolean))];
+            
+            const select = document.getElementById('codebaseSelect');
+            select.innerHTML = '<option value="">All Codebases</option>';
+            codebases.forEach(codebase => {
+                const option = document.createElement('option');
+                option.value = codebase;
+                option.textContent = codebase;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading codebase options:', error);
+        }
+    }
+    
+    applyFilters() {
+        let filteredNodes = [...this.data.nodes];
+        let filteredLinks = [...this.data.links];
+        
+        // Filter by document types
+        if (this.filters.docTypeFilters.size > 0) {
+            filteredNodes = filteredNodes.filter(node => 
+                this.filters.docTypeFilters.has(node.componentType)
+            );
+        }
+        
+        // Filter by project if specified
+        if (this.filters.selectedProject) {
+            filteredNodes = filteredNodes.filter(node => 
+                node.metadata?.project === this.filters.selectedProject
+            );
+        }
+        
+        // Filter links to only include connections between filtered nodes
+        const nodeIds = new Set(filteredNodes.map(n => n.id));
+        filteredLinks = filteredLinks.filter(link => 
+            nodeIds.has(link.source) && nodeIds.has(link.target)
+        );
+        
+        // Filter by connection types
+        if (this.filters.connectionTypeFilters.size > 0) {
+            filteredLinks = filteredLinks.filter(link => 
+                this.filters.connectionTypeFilters.has(link.type)
+            );
+        }
+        
+        this.filteredData = { nodes: filteredNodes, links: filteredLinks };
+    }
+    
+    updateFilterOptions() {
+        // Update document type filters
+        const docTypes = new Set();
+        this.data.nodes.forEach(node => {
+            if (node.componentType) {
+                docTypes.add(node.componentType);
+            }
+        });
+        this.createFilterCheckboxes('docTypeFilters', docTypes, 'docTypeFilters');
+        
+        // Update connection type filters
+        const connectionTypes = new Set();
+        this.data.links.forEach(link => {
+            connectionTypes.add(link.type);
+        });
+        this.createFilterCheckboxes('connectionTypeFilters', connectionTypes, 'connectionTypeFilters');
+        
+        // Update project options if available
+        const projects = new Set();
+        this.data.nodes.forEach(node => {
+            if (node.metadata?.project) {
+                projects.add(node.metadata.project);
+            }
+        });
+        
+        if (projects.size > 0) {
+            this.updateProjectFilter(projects);
+        }
+    }
+    
+    createFilterCheckboxes(containerId, options, filterType) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        options.forEach(option => {
+            const label = document.createElement('label');
+            label.className = 'checkbox-item';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = option;
+            checkbox.checked = true; // Default to showing all
+            
+            checkbox.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    this.filters[filterType].add(option);
+                } else {
+                    this.filters[filterType].delete(option);
+                }
+                this.applyFilters();
+                this.renderVisualization();
+                this.updateStatistics();
+            });
+            
+            // Initialize filter set
+            this.filters[filterType].add(option);
+            
+            const span = document.createElement('span');
+            span.textContent = option.replace('_', ' ');
+            
+            label.appendChild(checkbox);
+            label.appendChild(span);
+            container.appendChild(label);
+        });
+    }
+    
+    updateProjectFilter(projects) {
+        // Check if project filter already exists
+        let projectContainer = document.getElementById('projectFilterContainer');
+        if (!projectContainer) {
+            // Create project filter section
+            const filtersDiv = document.getElementById('filters');
+            const filterGroup = document.createElement('div');
+            filterGroup.className = 'filter-group';
+            filterGroup.id = 'projectFilterContainer';
+            
+            const label = document.createElement('label');
+            label.textContent = 'Project:';
+            
+            const select = document.createElement('select');
+            select.id = 'projectSelect';
+            select.addEventListener('change', (e) => {
+                this.filters.selectedProject = e.target.value;
+                this.applyFilters();
+                this.renderVisualization();
+                this.updateStatistics();
+            });
+            
+            filterGroup.appendChild(label);
+            filterGroup.appendChild(select);
+            filtersDiv.appendChild(filterGroup);
+            
+            projectContainer = filterGroup;
+        }
+        
+        const select = document.getElementById('projectSelect');
+        select.innerHTML = '<option value="">All Projects</option>';
+        
+        projects.forEach(project => {
+            const option = document.createElement('option');
+            option.value = project;
+            option.textContent = project;
+            select.appendChild(option);
+        });
     }
     
     renderVisualization() {
