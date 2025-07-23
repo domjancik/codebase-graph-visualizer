@@ -6,7 +6,7 @@ class TaskManager {
     this.currentTask = null;
     this.filters = {
       status: '',
-      project: ''
+      projects: new Set()
     };
     
     // Auto-refresh settings
@@ -73,14 +73,8 @@ class TaskManager {
       });
     }
 
-    // Project filter
-    const projectFilter = document.getElementById('projectFilter');
-    if (projectFilter) {
-      projectFilter.addEventListener('change', (e) => {
-        this.filters.project = e.target.value;
-        this.renderTasks();
-      });
-    }
+    // Project multi-select setup
+    this.setupMultiSelectProject();
 
     // Modal close
     const closeModal = document.getElementById('close-modal');
@@ -169,26 +163,94 @@ class TaskManager {
 
     console.log('Available projects:', Array.from(projects)); // Debug log
 
-    const projectFilter = document.getElementById('projectFilter');
-    if (projectFilter) {
-      // Store current selection
-      const currentSelection = projectFilter.value;
+    this.populateProjectMultiSelect(Array.from(projects).sort());
+  }
+
+  populateProjectMultiSelect(projects) {
+    const container = document.getElementById('projectOptions');
+    if (!container) return;
+    
+    // Keep the "All Projects" option, add individual project options
+    projects.forEach(project => {
+      const label = document.createElement('label');
+      label.className = 'checkbox-item';
       
-      // Clear existing options except "All Projects"
-      projectFilter.innerHTML = '<option value="">All Projects</option>';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = project;
+      checkbox.addEventListener('change', () => this.handleProjectSelection());
       
-      // Add project options
-      Array.from(projects).sort().forEach(project => {
-        const option = document.createElement('option');
-        option.value = project;
-        option.textContent = project;
-        projectFilter.appendChild(option);
-      });
+      const span = document.createElement('span');
+      span.textContent = project;
       
-      // Restore selection if it still exists
-      if (currentSelection && projects.has(currentSelection)) {
-        projectFilter.value = currentSelection;
+      label.appendChild(checkbox);
+      label.appendChild(span);
+      container.appendChild(label);
+    });
+  }
+
+  setupMultiSelectProject() {
+    const btn = document.getElementById('projectSelectBtn');
+    const dropdown = document.getElementById('projectSelectDropdown');
+    const allOption = document.getElementById('allProjectsOption');
+    
+    if (!btn || !dropdown || !allOption) return;
+    
+    // Toggle dropdown
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!btn.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.style.display = 'none';
       }
+    });
+    
+    // Handle "All Projects" option
+    allOption.addEventListener('change', () => {
+      if (allOption.checked) {
+        // Uncheck all other options
+        const otherOptions = dropdown.querySelectorAll('input[type="checkbox"]:not(#allProjectsOption)');
+        otherOptions.forEach(option => option.checked = false);
+        this.filters.projects.clear();
+      }
+      this.updateProjectButtonText();
+      this.renderTasks();
+    });
+  }
+  
+  handleProjectSelection() {
+    const allOption = document.getElementById('allProjectsOption');
+    const otherOptions = document.querySelectorAll('#projectOptions input[type="checkbox"]:not(#allProjectsOption)');
+    const selectedOptions = [...otherOptions].filter(option => option.checked);
+    
+    if (selectedOptions.length > 0) {
+      // If any specific project is selected, uncheck "All Projects"
+      if (allOption) allOption.checked = false;
+      this.filters.projects = new Set(selectedOptions.map(option => option.value));
+    } else {
+      // If no specific project is selected, check "All Projects"
+      if (allOption) allOption.checked = true;
+      this.filters.projects.clear();
+    }
+    
+    this.updateProjectButtonText();
+    this.renderTasks();
+  }
+  
+  updateProjectButtonText() {
+    const textSpan = document.getElementById('projectSelectText');
+    if (!textSpan) return;
+    
+    if (this.filters.projects.size === 0) {
+      textSpan.textContent = 'All Projects';
+    } else if (this.filters.projects.size === 1) {
+      textSpan.textContent = [...this.filters.projects][0];
+    } else {
+      textSpan.textContent = `${this.filters.projects.size} Projects`;
     }
   }
 
@@ -204,22 +266,22 @@ class TaskManager {
       console.log('Tasks after status filter:', filteredTasks.length);
     }
     
-    // Apply project filter
-    if (this.filters.project) {
-      console.log('Applying project filter for:', this.filters.project);
-      
+    // Apply projects filter
+    if (this.filters.projects.size > 0) {
+      console.log('Applying projects filter for:', this.filters.projects);
+
       filteredTasks = filteredTasks.filter(task => {
         // First check if task has a direct codebase property
-        if (task.codebase === this.filters.project) {
+        if (this.filters.projects.has(task.codebase)) {
           console.log('Task matches by direct codebase:', task.name, task.codebase);
           return true;
         }
-        
+
         // Then check related components
         if (task.relatedComponentIds && task.relatedComponentIds.length > 0) {
           const matches = task.relatedComponentIds.some(componentId => {
             const component = this.components.find(c => c.id === componentId);
-            if (component && component.codebase === this.filters.project) {
+            if (component && this.filters.projects.has(component.codebase)) {
               console.log('Task matches by related component:', task.name, 'via', component.name, component.codebase);
               return true;
             }
@@ -227,13 +289,13 @@ class TaskManager {
           });
           if (matches) return true;
         }
-        
+
         // If task has no codebase and no related components, exclude it
         console.log('Task excluded:', task.name, 'codebase:', task.codebase, 'relatedComponents:', task.relatedComponentIds?.length || 0);
         return false;
       });
       
-      console.log('Tasks after project filter:', filteredTasks.length);
+      console.log('Tasks after projects filter:', filteredTasks.length);
     }
 
     // Clear all columns

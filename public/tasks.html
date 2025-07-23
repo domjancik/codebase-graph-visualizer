@@ -23,9 +23,20 @@
                 <option value="BLOCKED">Blocked</option>
                 <option value="CANCELLED">Cancelled</option>
             </select>
-            <select id="projectFilter">
-                <option value="">All Projects</option>
-            </select>
+            <div id="projectSelectContainer">
+                <button id="projectSelectBtn" class="multi-select-btn">
+                    <span id="projectSelectText">All Projects</span>
+                    <span class="dropdown-arrow">▼</span>
+                </button>
+                <div id="projectSelectDropdown" class="multi-select-dropdown" style="display: none;">
+                    <div class="multi-select-options" id="projectOptions">
+                        <label class="checkbox-item">
+                            <input type="checkbox" value="" id="allProjectsOption" checked>
+                            <span>All Projects</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
             <button id="refreshBtn">🔄 Refresh</button>
             <button id="addTaskBtn" class="btn-add-task">➕ Add Task</button>
             <a href="/" id="graphViewBtn" class="btn-view-graph">🔍 Graph View</a>
