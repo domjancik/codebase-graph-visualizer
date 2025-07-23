@@ -398,6 +398,9 @@ class DesignDocsVisualization {
         }
         
         this.filteredData = { nodes: filteredNodes, links: filteredLinks };
+        
+        // Auto-refresh layout when filtered data changes
+        this.updateLayout();
     }
     
     updateFilterOptions() {
