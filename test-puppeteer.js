@@ -223,17 +223,22 @@ async function testTaskOrdering(page) {
       lastUpdated: row.querySelector('.progress-task-updated')?.textContent
     }));
     
-    // Get tasks with their simulated timestamps
+    // Get tasks with their real timestamps and calculate expected order using same logic as frontend
     const tasksWithTimestamps = window.taskManager.tasks.map(task => ({
       id: task.id,
       name: task.name,
       status: task.status,
-      simulatedUpdateTime: window.taskManager.getSimulatedUpdateTimestamp(task),
-      displayTime: window.taskManager.getSimulatedUpdateTime(task)
+      timestamp: task.updatedAt || task.lastModified || task.createdAt || task.created || null,
+      displayTime: window.taskManager.formatTimestamp(task.updatedAt || task.lastModified || task.createdAt || task.created)
     }));
     
-    // Sort by timestamp (newest first) as the code should do
-    const expectedOrder = tasksWithTimestamps.sort((a, b) => b.simulatedUpdateTime - a.simulatedUpdateTime);
+    // Sort by real timestamp (newest first) using same logic as frontend
+    const expectedOrder = tasksWithTimestamps.sort((a, b) => {
+      if (!a.timestamp && !b.timestamp) return 0;
+      if (!a.timestamp) return 1;
+      if (!b.timestamp) return -1;
+      return new Date(b.timestamp) - new Date(a.timestamp);
+    });
     
     return {
       displayedOrder,
@@ -241,6 +246,7 @@ async function testTaskOrdering(page) {
         id: task.id,
         name: task.name,
         status: task.status,
+        timestamp: task.timestamp,
         displayTime: task.displayTime
       }))
     };
@@ -248,7 +254,7 @@ async function testTaskOrdering(page) {
   
   console.log('Task ordering data:');
   console.log('Displayed order:', orderingData?.displayedOrder);
-  console.log('Expected order (by timestamp):', orderingData?.expectedOrder);
+  console.log('Expected order (by real timestamp):', orderingData?.expectedOrder);
   
   // Check if ordering matches expectations
   if (orderingData && orderingData.displayedOrder.length > 0) {
@@ -257,7 +263,7 @@ async function testTaskOrdering(page) {
       return displayedTask.taskId === expectedTask.id;
     });
     
-    console.log('Task ordering matches expected (by timestamp):', orderMatches);
+    console.log('Task ordering matches expected (by real timestamp):', orderMatches);
     
     if (!orderMatches) {
       console.log('First few tasks in displayed order:');
@@ -267,7 +273,7 @@ async function testTaskOrdering(page) {
       
       console.log('First few tasks in expected order:');
       orderingData.expectedOrder.slice(0, 3).forEach((task, i) => {
-        console.log(`  ${i + 1}. ${task.name} (${task.status}) - ${task.displayTime}`);
+        console.log(`  ${i + 1}. ${task.name} (${task.status}) - ${task.displayTime} (${task.timestamp})`);
       });
     }
   }
