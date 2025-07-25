@@ -379,15 +379,16 @@ class TaskManager {
   }
 
   renderProgressView(filteredTasks) {
-    // Add simulated update timestamps and sort by them (newest first)
-    const tasksWithTimestamps = filteredTasks.map(task => ({
-      ...task,
-      simulatedUpdateTime: this.getSimulatedUpdateTimestamp(task)
-    }));
-    
-    const sortedTasks = tasksWithTimestamps.sort((a, b) => {
-      // Sort by update time (newest first)
-      return b.simulatedUpdateTime - a.simulatedUpdateTime;
+    // Sort tasks by update time (newest first), fallback to created time
+    const sortedTasks = filteredTasks.sort((a, b) => {
+      const aTime = a.updatedAt || a.lastModified || a.createdAt || a.created;
+      const bTime = b.updatedAt || b.lastModified || b.createdAt || b.created;
+      
+      if (!aTime && !bTime) return 0;
+      if (!aTime) return 1;
+      if (!bTime) return -1;
+      
+      return new Date(bTime) - new Date(aTime);
     });
 
     // Update progress stats
@@ -459,8 +460,8 @@ class TaskManager {
     
     const statusName = statusDisplayNames[task.status] || task.status;
     
-    // Simulate "last updated" time (in a real app, this would come from the API)
-    const lastUpdated = this.getSimulatedUpdateTime(task);
+    // Get real last updated time from the task data
+    const lastUpdated = this.formatTimestamp(task.updatedAt || task.lastModified || task.createdAt || task.created);
     
     rowDiv.innerHTML = `
       <div class="progress-task-header">
@@ -1320,6 +1321,34 @@ class TaskManager {
     }
   }
 
+  formatTimestamp(timestamp) {
+    if (!timestamp) {
+      return 'unknown';
+    }
+    
+    try {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffInSeconds = Math.floor((now - date) / 1000);
+      
+      if (diffInSeconds < 60) {
+        return `${diffInSeconds}s ago`;
+      } else if (diffInSeconds < 3600) {
+        const minutes = Math.floor(diffInSeconds / 60);
+        return `${minutes}m ago`;
+      } else if (diffInSeconds < 86400) {
+        const hours = Math.floor(diffInSeconds / 3600);
+        return `${hours}h ago`;
+      } else {
+        const days = Math.floor(diffInSeconds / 86400);
+        return `${days}d ago`;
+      }
+    } catch (error) {
+      console.warn('Error formatting timestamp:', timestamp, error);
+      return 'unknown';
+    }
+  }
+
   // Override the existing loadTasks to update timestamp
   async loadTasks() {
     try {
@@ -1331,7 +1360,14 @@ class TaskManager {
       this.tasks = data.nodes.filter(node => node.type === 'task');
       this.components = data.nodes.filter(node => node.type === 'component');
       
-      console.log('Loaded tasks:', this.tasks); // Debug log
+      console.log('Loaded tasks with timestamps:', this.tasks.map(t => ({ 
+        name: t.name, 
+        created: t.created, 
+        updated: t.updated, 
+        createdAt: t.createdAt, 
+        updatedAt: t.updatedAt,
+        lastModified: t.lastModified 
+      }))); // Debug log
       
       this.populateProjectFilter();
       this.renderTasks();
