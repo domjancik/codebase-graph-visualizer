@@ -176,7 +176,7 @@ class TaskManager {
       }
     });
 
-    console.log('Available projects:', Array.from(projects)); // Debug log
+    console.log('Available codebases:', Array.from(projects)); // Debug log
 
     this.populateProjectMultiSelect(Array.from(projects).sort());
   }
@@ -185,7 +185,7 @@ class TaskManager {
     const container = document.getElementById('projectOptions');
     if (!container) return;
     
-    // Keep the "All Projects" option, add individual project options
+    // Keep the "All Codebases" option, add individual codebase options
     projects.forEach(project => {
       const label = document.createElement('label');
       label.className = 'checkbox-item';
@@ -224,7 +224,7 @@ class TaskManager {
       }
     });
     
-    // Handle "All Projects" option
+    // Handle "All Codebases" option
     allOption.addEventListener('change', () => {
       if (allOption.checked) {
         // Uncheck all other options
@@ -243,11 +243,11 @@ class TaskManager {
     const selectedOptions = [...otherOptions].filter(option => option.checked);
     
     if (selectedOptions.length > 0) {
-      // If any specific project is selected, uncheck "All Projects"
+      // If any specific codebase is selected, uncheck "All Codebases"
       if (allOption) allOption.checked = false;
       this.filters.projects = new Set(selectedOptions.map(option => option.value));
     } else {
-      // If no specific project is selected, check "All Projects"
+      // If no specific codebase is selected, check "All Codebases"
       if (allOption) allOption.checked = true;
       this.filters.projects.clear();
     }
@@ -261,11 +261,11 @@ class TaskManager {
     if (!textSpan) return;
     
     if (this.filters.projects.size === 0) {
-      textSpan.textContent = 'All Projects';
+      textSpan.textContent = 'All Codebases';
     } else if (this.filters.projects.size === 1) {
       textSpan.textContent = [...this.filters.projects][0];
     } else {
-      textSpan.textContent = `${this.filters.projects.size} Projects`;
+      textSpan.textContent = `${this.filters.projects.size} Codebases`;
     }
   }
 
@@ -311,9 +311,9 @@ class TaskManager {
       console.log('Tasks after status filter:', filteredTasks.length);
     }
     
-    // Apply projects filter
+    // Apply codebases filter
     if (this.filters.projects.size > 0) {
-      console.log('Applying projects filter for:', this.filters.projects);
+      console.log('Applying codebases filter for:', this.filters.projects);
 
       filteredTasks = filteredTasks.filter(task => {
         // First check if task has a direct codebase property
@@ -339,8 +339,8 @@ class TaskManager {
         console.log('Task excluded:', task.name, 'codebase:', task.codebase, 'relatedComponents:', task.relatedComponentIds?.length || 0);
         return false;
       });
-      
-      console.log('Tasks after projects filter:', filteredTasks.length);
+
+      console.log('Tasks after codebases filter:', filteredTasks.length);
     }
 
     // Render based on current view mode
