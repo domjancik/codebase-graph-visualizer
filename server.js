@@ -123,12 +123,21 @@ class GraphVisualizerServer {
         ...record.get('relationship').properties
       }));
 
-      const tasks = tasksResult.records.map(record => ({
-        ...record.get('t').properties,
-        relatedComponentIds: record.get('relatedComponentIds'),
-        relatedComponents: record.get('relatedComponents').map(c => c.properties),
-        type: 'task'
-      }));
+      const tasks = tasksResult.records.map(record => {
+        const taskProps = record.get('t').properties;
+        return {
+          ...taskProps,
+          // Convert Neo4j datetime objects to ISO strings
+          created: taskProps.created ? taskProps.created.toString() : null,
+          updated: taskProps.updated ? taskProps.updated.toString() : null,
+          createdAt: taskProps.created ? taskProps.created.toString() : null,
+          updatedAt: taskProps.updated ? taskProps.updated.toString() : null,
+          lastModified: taskProps.updated ? taskProps.updated.toString() : taskProps.created ? taskProps.created.toString() : null,
+          relatedComponentIds: record.get('relatedComponentIds'),
+          relatedComponents: record.get('relatedComponents').map(c => c.properties),
+          type: 'task'
+        };
+      });
 
       res.json({
         nodes: [...components, ...tasks],
