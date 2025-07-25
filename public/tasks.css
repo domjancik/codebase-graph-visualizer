@@ -751,7 +751,7 @@
   padding: 20px;
   max-width: 1400px;
   margin: 0 auto;
-  height: calc(100vh - 200px); /* Account for header, controls, and auto-refresh bar */
+  height: calc(100vh - 250px); /* Account for header, controls, auto-refresh bar, and margins */
   display: flex;
   flex-direction: column;
   overflow: hidden; /* Prevent container from scrolling */
@@ -793,7 +793,11 @@
   gap: 12px;
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 8px; /* Space for scrollbar */
+  min-height: 0; /* Allow flex item to shrink below content size */
+  /* Debug: Ensure we can see this working */
+  border: 1px solid transparent;
 }
 
 /* Progress Row Item */
