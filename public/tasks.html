@@ -37,6 +37,10 @@
                     </div>
                 </div>
             </div>
+            <div class="view-mode-toggle">
+                <button id="kanbanViewBtn" class="view-toggle-btn active">📋 Kanban</button>
+                <button id="progressViewBtn" class="view-toggle-btn">📊 Progress Rows</button>
+            </div>
             <button id="refreshBtn">🔄 Refresh</button>
             <button id="addTaskBtn" class="btn-add-task">➕ Add Task</button>
             <a href="/" id="graphViewBtn" class="btn-view-graph">🔍 Graph View</a>
@@ -85,6 +89,20 @@
                 </div>
                 <div class="task-list" id="cancelled-tasks"></div>
             </div>
+        </div>
+    </div>
+
+    <!-- Progress Rows View (initially hidden) -->
+    <div id="progress-view" class="progress-container" style="display: none;">
+        <div class="progress-header">
+            <h2>📊 Tasks Progress Overview</h2>
+            <div class="progress-stats">
+                <span id="progress-total-count">Total: 0</span>
+                <span id="progress-completion-rate">Avg. Progress: 0%</span>
+            </div>
+        </div>
+        <div id="progress-task-list" class="progress-task-list">
+            <!-- Tasks will be dynamically inserted here -->
         </div>
     </div>
 

@@ -9,6 +9,9 @@ class TaskManager {
       projects: new Set()
     };
     
+    // View mode settings
+    this.currentView = 'kanban'; // 'kanban' or 'progress'
+    
     // Auto-refresh settings
     this.autoRefreshInterval = null;
     this.autoRefreshDelay = 30000; // 30 seconds default
@@ -112,6 +115,18 @@ class TaskManager {
     const cancelTaskBtn = document.getElementById('cancel-task');
     if (cancelTaskBtn) {
       cancelTaskBtn.addEventListener('click', () => this.closeAddTaskModal());
+    }
+
+    // View mode toggle buttons
+    const kanbanViewBtn = document.getElementById('kanbanViewBtn');
+    const progressViewBtn = document.getElementById('progressViewBtn');
+    
+    if (kanbanViewBtn) {
+      kanbanViewBtn.addEventListener('click', () => this.switchView('kanban'));
+    }
+    
+    if (progressViewBtn) {
+      progressViewBtn.addEventListener('click', () => this.switchView('progress'));
     }
   }
 
@@ -254,6 +269,36 @@ class TaskManager {
     }
   }
 
+  switchView(viewType) {
+    this.currentView = viewType;
+    
+    // Update button states
+    const kanbanBtn = document.getElementById('kanbanViewBtn');
+    const progressBtn = document.getElementById('progressViewBtn');
+    
+    if (kanbanBtn && progressBtn) {
+      kanbanBtn.classList.toggle('active', viewType === 'kanban');
+      progressBtn.classList.toggle('active', viewType === 'progress');
+    }
+    
+    // Show/hide appropriate containers
+    const taskContainer = document.querySelector('.task-container');
+    const progressContainer = document.getElementById('progress-view');
+    
+    if (taskContainer && progressContainer) {
+      if (viewType === 'kanban') {
+        taskContainer.style.display = 'block';
+        progressContainer.style.display = 'none';
+      } else {
+        taskContainer.style.display = 'none';
+        progressContainer.style.display = 'block';
+      }
+    }
+    
+    // Re-render tasks in the new view
+    this.renderTasks();
+  }
+
   renderTasks() {
     let filteredTasks = this.tasks;
     
@@ -298,6 +343,15 @@ class TaskManager {
       console.log('Tasks after projects filter:', filteredTasks.length);
     }
 
+    // Render based on current view mode
+    if (this.currentView === 'progress') {
+      this.renderProgressView(filteredTasks);
+    } else {
+      this.renderKanbanView(filteredTasks);
+    }
+  }
+
+  renderKanbanView(filteredTasks) {
     // Clear all columns
     const columns = {
       'TODO': document.getElementById('todo-tasks'),
@@ -324,12 +378,195 @@ class TaskManager {
     this.updateTaskCounts(filteredTasks);
   }
 
+  renderProgressView(filteredTasks) {
+    // Add simulated update timestamps and sort by them (newest first)
+    const tasksWithTimestamps = filteredTasks.map(task => ({
+      ...task,
+      simulatedUpdateTime: this.getSimulatedUpdateTimestamp(task)
+    }));
+    
+    const sortedTasks = tasksWithTimestamps.sort((a, b) => {
+      // Sort by update time (newest first)
+      return b.simulatedUpdateTime - a.simulatedUpdateTime;
+    });
+
+    // Update progress stats
+    this.updateProgressStats(filteredTasks);
+
+    // Clear and populate progress list
+    const progressList = document.getElementById('progress-task-list');
+    if (progressList) {
+      progressList.innerHTML = '';
+      
+      sortedTasks.forEach(task => {
+        const taskRow = this.createProgressTaskRow(task);
+        progressList.appendChild(taskRow);
+      });
+    }
+  }
+
+  updateProgressStats(filteredTasks) {
+    const totalCountElement = document.getElementById('progress-total-count');
+    const completionRateElement = document.getElementById('progress-completion-rate');
+    
+    if (totalCountElement) {
+      totalCountElement.textContent = `Total: ${filteredTasks.length}`;
+    }
+    
+    if (completionRateElement && filteredTasks.length > 0) {
+      // Normalize progress values: if > 1, treat as percentage (divide by 100)
+      const normalizedProgress = filteredTasks.map(task => {
+        let progress = task.progress || 0;
+        // If progress is greater than 1, assume it's a percentage and convert to decimal
+        if (progress > 1) {
+          progress = progress / 100;
+        }
+        // Cap at 1.0 (100%)
+        return Math.min(progress, 1.0);
+      });
+      
+      const avgProgress = normalizedProgress.reduce((sum, progress) => sum + progress, 0) / normalizedProgress.length;
+      const avgProgressPercent = Math.min(Math.round(avgProgress * 100), 100); // Cap at 100%
+      
+      completionRateElement.textContent = `Avg. Progress: ${avgProgressPercent}%`;
+    } else if (completionRateElement) {
+      completionRateElement.textContent = 'Avg. Progress: 0%';
+    }
+  }
+
+  createProgressTaskRow(task) {
+    const rowDiv = document.createElement('div');
+    rowDiv.className = 'progress-task-row';
+    rowDiv.setAttribute('data-task-id', task.id);
+    rowDiv.setAttribute('data-status', task.status);
+    
+    // Normalize progress: if > 1, treat as percentage (divide by 100), then cap at 100%
+    let normalizedProgress = task.progress || 0;
+    if (normalizedProgress > 1) {
+      normalizedProgress = normalizedProgress / 100;
+    }
+    normalizedProgress = Math.min(normalizedProgress, 1.0);
+    const progressPercentage = Math.round(normalizedProgress * 100);
+    
+    // Get status display name
+    const statusDisplayNames = {
+      'TODO': 'Todo',
+      'IN_PROGRESS': 'In Progress',
+      'DONE': 'Done',
+      'BLOCKED': 'Blocked',
+      'CANCELLED': 'Cancelled'
+    };
+    
+    const statusName = statusDisplayNames[task.status] || task.status;
+    
+    // Simulate "last updated" time (in a real app, this would come from the API)
+    const lastUpdated = this.getSimulatedUpdateTime(task);
+    
+    rowDiv.innerHTML = `
+      <div class="progress-task-header">
+        <h3 class="progress-task-title">${task.name || 'Unnamed Task'}</h3>
+        <div class="progress-task-meta">
+          <span class="progress-task-status">${statusName}</span>
+          <span class="progress-task-updated">Updated ${lastUpdated}</span>
+        </div>
+      </div>
+      <div class="progress-task-description">
+        ${task.description || 'No description available'}
+      </div>
+      <div class="progress-task-progress-container">
+        <div class="progress-task-progress-bar">
+          <div class="progress-task-progress-fill" style="width: ${progressPercentage}%"></div>
+        </div>
+        <span class="progress-task-progress-text">${progressPercentage}%</span>
+      </div>
+    `;
+
+    // Add click handler
+    rowDiv.addEventListener('click', () => this.openTaskModal(task));
+
+    return rowDiv;
+  }
+
+  getSimulatedUpdateTimestamp(task) {
+    // Generate a consistent timestamp based on task ID for deterministic ordering
+    // In a real implementation, this would come from a lastUpdated timestamp
+    const baseTime = new Date().getTime();
+    const taskHash = this.hashCode(task.id || task.name || 'default');
+    
+    let hoursAgo;
+    switch (task.status) {
+      case 'IN_PROGRESS':
+        hoursAgo = (Math.abs(taskHash) % 4) + 1; // 1-4 hours ago
+        break;
+      case 'BLOCKED':
+        hoursAgo = (Math.abs(taskHash) % 12) + 6; // 6-18 hours ago
+        break;
+      case 'TODO':
+        hoursAgo = (Math.abs(taskHash) % 24) + 12; // 12-36 hours ago
+        break;
+      case 'DONE':
+        hoursAgo = (Math.abs(taskHash) % 48) + 24; // 1-3 days ago
+        break;
+      default:
+        hoursAgo = (Math.abs(taskHash) % 72) + 48; // 2-5 days ago
+    }
+    
+    return baseTime - (hoursAgo * 60 * 60 * 1000);
+  }
+
+  hashCode(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return hash;
+  }
+
+  getSimulatedUpdateTime(task) {
+    // In a real implementation, this would come from a lastUpdated timestamp
+    // For now, we'll simulate based on task properties
+    const now = new Date();
+    let hoursAgo;
+    
+    switch (task.status) {
+      case 'IN_PROGRESS':
+        hoursAgo = Math.floor(Math.random() * 4) + 1; // 1-4 hours ago
+        break;
+      case 'BLOCKED':
+        hoursAgo = Math.floor(Math.random() * 12) + 6; // 6-18 hours ago
+        break;
+      case 'TODO':
+        hoursAgo = Math.floor(Math.random() * 24) + 12; // 12-36 hours ago
+        break;
+      case 'DONE':
+        hoursAgo = Math.floor(Math.random() * 48) + 24; // 1-3 days ago
+        break;
+      default:
+        hoursAgo = Math.floor(Math.random() * 72) + 48; // 2-5 days ago
+    }
+    
+    if (hoursAgo < 24) {
+      return `${hoursAgo}h ago`;
+    } else {
+      const daysAgo = Math.floor(hoursAgo / 24);
+      return `${daysAgo}d ago`;
+    }
+  }
+
   createTaskElement(task) {
     const taskDiv = document.createElement('div');
     taskDiv.className = 'task-item';
     taskDiv.setAttribute('data-task-id', task.id);
     
-    const progressPercentage = Math.round((task.progress || 0) * 100);
+    // Normalize progress: if > 1, treat as percentage (divide by 100), then cap at 100%
+    let normalizedProgress = task.progress || 0;
+    if (normalizedProgress > 1) {
+      normalizedProgress = normalizedProgress / 100;
+    }
+    normalizedProgress = Math.min(normalizedProgress, 1.0);
+    const progressPercentage = Math.round(normalizedProgress * 100);
     
     taskDiv.innerHTML = `
       <div class="task-header">
@@ -399,7 +636,14 @@ class TaskManager {
       modalStatus.className = `status-badge status-${(task.status || 'TODO').toLowerCase()}`;
     }
     
-    const progressPercentage = Math.round((task.progress || 0) * 100);
+    // Normalize progress: if > 1, treat as percentage (divide by 100), then cap at 100%
+    let normalizedProgress = task.progress || 0;
+    if (normalizedProgress > 1) {
+      normalizedProgress = normalizedProgress / 100;
+    }
+    normalizedProgress = Math.min(normalizedProgress, 1.0);
+    const progressPercentage = Math.round(normalizedProgress * 100);
+    
     if (modalProgress) {
       modalProgress.style.width = `${progressPercentage}%`;
     }
@@ -1107,5 +1351,5 @@ class TaskManager {
 
 // Initialize the task manager when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-  new TaskManager();
+  window.taskManager = new TaskManager();
 });
